@@ -1,0 +1,34 @@
+<div class="container">
+    <div class="row ms-5 px-5">
+        <div class="col col-3">
+            <a class="btn btn-light" data-bs-toggle="collapse" href="#message-form" role="button" aria-expanded="false" aria-controls="message-form">
+            [Write a new message]
+            </a>
+        </div>
+        <div class={"col col-8 collapse #{if @show do "show" end}"} id="message-form">
+            <.form :let={f} for={@changeset} phx-change="validate" phx-submit="save">
+                <div class="input-group mb-3">
+                    <%= text_input f, :text, class: "form-control disabled", placeholder: "Enter text here", required: true%>
+                    <%= submit class: "btn btn-dark" do %>
+                        <%= Bootstrap.Icons.send_fill() %>
+                    <% end %>
+                </div>
+                <%= error_tag f, :text %>
+            </.form>
+        </div>
+    </div>
+    <%= for message <- @messages do %>
+        <div class="card col-10 mx-auto d-block my-5 shadow mb-5 bg-white rounded">
+            <div class="card-body">
+                <p class="card-text">
+                    <%= message.text %>
+                </p>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">
+                    Written at <%= elem(Timex.format(message.timestamp, "%Y-%m-%d %H:%M:%S", :strftime),1) %>
+                </small>
+            </div>
+        </div>
+    <% end %>
+</div>
