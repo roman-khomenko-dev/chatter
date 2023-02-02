@@ -1,7 +1,7 @@
 defmodule ChatterWeb.ChatLive.Index do
   use ChatterWeb, :live_view
 
-  alias Chatter.Message
+  alias Chatter.{Message, MessageAgent}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -30,15 +30,19 @@ defmodule ChatterWeb.ChatLive.Index do
   @impl true
   def handle_event("save", %{"message" => params}, socket) do
     case Message.create(params) do
-      {:ok, _message} -> {:noreply, socket}
-      _error -> {:noreply, socket |> put_flash(:error, "Creation failed")}
+      {:ok, message} ->
+        MessageAgent.add(MessageAgent, message)
+        {:noreply, assign(socket, changeset: Message.change_message(%Message{}))}
+
+      _error ->
+        {:noreply, socket |> put_flash(:error, "Creation failed")}
     end
   end
 
   defp assign_default(socket) do
     socket
     |> assign(show: false)
-    |> assign(messages: [])
+    |> assign(messages: MessageAgent.get())
     |> assign(:changeset, Message.change_message(%Message{}))
   end
 
