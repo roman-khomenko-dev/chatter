@@ -1,7 +1,7 @@
 defmodule ChatterWeb.ChatLive.Index do
   use ChatterWeb, :live_view
 
-  alias Chatter.{Message, MessageAgent}
+  alias Chatter.{Message, MessageAgent, UsernameSpace.Generator}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -10,8 +10,8 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   @impl true
-  def handle_info({Message, {:message, _action}, message}, socket) do
-    {:noreply, assign(socket, messages: [message | socket.assigns.messages])}
+  def handle_info({Message, {:message, _action}, _message}, socket) do
+    {:noreply, assign(socket, messages: MessageAgent.get())}
   end
 
   @impl true
@@ -31,7 +31,7 @@ defmodule ChatterWeb.ChatLive.Index do
   def handle_event("save", %{"message" => params}, socket) do
     case Message.create(params) do
       {:ok, message} ->
-        MessageAgent.add(MessageAgent, message)
+        MessageAgent.add(message)
         {:noreply, assign(socket, changeset: Message.change_message(%Message{}))}
 
       _error ->
@@ -39,11 +39,18 @@ defmodule ChatterWeb.ChatLive.Index do
     end
   end
 
+  @impl true
+  def handle_event("like", %{"uuid"=> uuid, "user" => user} = _params, socket) do
+    MessageAgent.set_like(MessageAgent, {uuid, user})
+    {:noreply, socket}
+  end
+
   defp assign_default(socket) do
     socket
     |> assign(show: false)
     |> assign(messages: MessageAgent.get())
-    |> assign(:changeset, Message.change_message(%Message{}))
+    |> assign(changeset: Message.change_message(%Message{}))
+    |> assign(username: elem(Generator.run, 1))
   end
 
   defp activate_show(socket),

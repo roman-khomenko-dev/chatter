@@ -1,6 +1,14 @@
 /* This file is for your main application CSS */
 @import "../node_modules/bootstrap/scss/bootstrap";
 
+.like-icon {
+  color: orange;
+}
+.like-icon :hover {
+  color: orangered;
+  cursor: pointer;
+}
+
 /* Alerts and form errors used by phx.new */
 .alert {
   padding: 15px;
