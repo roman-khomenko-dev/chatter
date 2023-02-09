@@ -22,8 +22,10 @@ defmodule Chatter.MessageAgent do
     Agent.update(__MODULE__, fn(state) -> Enum.map(state, fn message ->
       case Map.get(message, :uuid) == uuid do
         true ->
-          message = proceed_like(message, user)
-          elem(Message.broadcast_change({:ok, message}, {:message, :updated}), 1)
+          message
+          |> proceed_like(user)
+          |> Message.broadcast_change({:message, :updated})
+          |> elem(1)
         false -> message
       end
      end)
@@ -33,10 +35,12 @@ defmodule Chatter.MessageAgent do
   defp proceed_like(message, user), do: if Enum.member?(Map.get(message, :likes), user), do: remove_like(message, user), else: push_like(message, user)
 
   defp push_like(message, user) do
-    Map.put(message, :likes, [user | Map.get(message, :likes)])
+    message = Map.put(message, :likes, [user | Map.get(message, :likes)])
+    {:ok, message}
   end
 
   defp remove_like(message, user) do
-    Map.put(message, :likes, List.delete(Map.get(message, :likes), user))
+    message = Map.put(message, :likes, List.delete(Map.get(message, :likes), user))
+    {:ok, message}
   end
 end
