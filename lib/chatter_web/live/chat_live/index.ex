@@ -40,17 +40,17 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   @impl true
-  def handle_event("like", %{"uuid"=> uuid, "user" => user} = _params, socket) do
+  def handle_event("like", %{"uuid" => uuid, "user" => user} = _params, socket) do
     MessageAgent.set_like(MessageAgent, {uuid, user})
     {:noreply, socket}
   end
 
-  defp assign_default(socket) do
+  def assign_default(socket) do
     socket
     |> assign(show: false)
     |> assign(messages: MessageAgent.get())
     |> assign(changeset: Message.change_message(%Message{}))
-    |> assign(username: elem(Generator.run, 1))
+    |> assign(username: elem(Generator.run(), 1))
   end
 
   defp activate_show(socket),
