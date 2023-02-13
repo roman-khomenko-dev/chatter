@@ -1,14 +1,14 @@
 <div class="container">
     <div class="row ms-5 px-5">
         <div class="col col-3">
-            <a class="btn btn-light" data-bs-toggle="collapse" href="#message-form" role="button" aria-expanded="false" aria-controls="message-form">
+            <a class="btn btn-light" data-bs-toggle="collapse" href="#message-form-box" role="button" aria-expanded="false" aria-controls="message-form-box">
             [Write a new message]
             </a>
         </div>
-        <div class={"col col-8 collapse #{if @show do "show" end}"} id="message-form">
-            <.form :let={f} for={@changeset} phx-change="validate" phx-submit="save">
+        <div class={"col col-8 collapse #{if @show do "show" end}"} id="message-form-box">
+            <.form id="message-form" :let={f} for={@changeset} phx-change="validate" phx-submit="save">
                 <div class="input-group mb-3">
-                    <%= text_input f, :text, class: "form-control disabled", placeholder: "Enter text here", required: true%>
+                    <%= text_input f, :text, class: "form-control", placeholder: "Enter text here", required: true%>
                     <%= submit class: "btn btn-dark" do %>
                         <%= Bootstrap.Icons.send_fill() %>
                     <% end %>
