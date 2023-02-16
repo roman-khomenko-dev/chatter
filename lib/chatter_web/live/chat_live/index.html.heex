@@ -1,11 +1,11 @@
-<div class="container">
+<div class="container mx-5">
     <div class="row ms-5 px-5">
         <div class="col col-3">
             <a class="btn btn-light" data-bs-toggle="collapse" href="#message-form-box" role="button" aria-expanded="false" aria-controls="message-form-box">
             [Write a new message]
             </a>
         </div>
-        <div class={"col col-8 collapse #{if @show do "show" end}"} id="message-form-box">
+        <div class={"col col-8 collapse #{if @show_write do "show" end}"} id="message-form-box">
             <.form id="message-form" :let={f} for={@changeset} phx-change="validate" phx-submit="save">
                 <div class="input-group mb-3">
                     <%= text_input f, :text, class: "form-control", placeholder: "Enter text here", required: true%>
@@ -41,4 +41,21 @@
             </div>
         </div>
     <% end %>
+
+    <div class={"offcanvas offcanvas-start #{if @show_menu do "show" end}"} data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="menu" aria-labelledby="App menu">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="menu-label">[Menu box]</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close" phx-click="close_menu"></button>
+        </div>
+        <div class="offcanvas-body">
+            <h4> Search messages </h4>
+            <.form id="search-form" :let={f} for={@search} phx-change="search">
+                <%= text_input f, :text, class: "form-control", placeholder: "Message text", "phx-debounce": "800" %>
+                <div class="input-group mb-3">
+                    <%= select f, :likes_option, [">=": ">=", "<=": "<=", "=": "="], class: "form-control my-2", "phx-debounce": "800" %>
+                    <%= number_input f, :likes, class: "form-control my-2", "phx-debounce": "800", placeholder: "Expected likes", min: 0%>
+                </div>
+            </.form>
+        </div>
+    </div>
 </div>

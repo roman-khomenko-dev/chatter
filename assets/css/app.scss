@@ -1,6 +1,15 @@
 /* This file is for your main application CSS */
 @import "../node_modules/bootstrap/scss/bootstrap";
 
+.menu {
+  position: fixed;
+  right: 0;
+}
+
+.menu :hover {
+  cursor: pointer;
+}
+
 .like-icon {
   color: orange;
 }
