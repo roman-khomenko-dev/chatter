@@ -6,6 +6,8 @@
   <p class="alert alert-danger" role="alert"
     phx-click="lv:clear-flash"
     phx-value-key="error"><%= live_flash(@flash, :error) %></p>
-
+  <div class="menu" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+    <img src={Routes.static_path(@socket, "/images/menu.png" )} />
+  </div>
   <%= @inner_content %>
 </main>
