@@ -7,6 +7,11 @@ defmodule Chatter.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_coverage: [
+        summary: [
+          threshold: 70
+        ]
+      ],
       compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),

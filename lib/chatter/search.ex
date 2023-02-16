@@ -22,7 +22,7 @@ defmodule Chatter.Search do
     end
   end
 
-  defp get_likes(params) do
-    if byte_size(params["likes"]) > 0, do: String.to_integer(params["likes"]), else: nil
-  end
+  defp get_likes(%{"likes" => ""} = _params), do: nil
+
+  defp get_likes(%{"likes" => likes} = _params), do: String.to_integer(likes)
 end

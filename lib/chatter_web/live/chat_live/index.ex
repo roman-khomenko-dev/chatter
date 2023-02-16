@@ -98,17 +98,17 @@ defmodule ChatterWeb.ChatLive.Index do
     filter_text(message, search) && filter_likes(message, search)
   end
 
-  defp filter_text(message, search) do
-    if String.length(search.text) > 0, do: message.text =~ search.text, else: message
-  end
+  defp filter_text(message, %Search{text: nil} = _search), do: message
+
+  defp filter_text(message, %Search{text: search_text} = _search), do: message.text =~ search_text
 
   defp filter_likes(message, %{likes: nil} = _search), do: message
 
-  defp filter_likes(message, %{likes_option: option, likes: count} = _search) do
+  defp filter_likes(message, %{likes_option: option, likes: likes_count} = _search) do
     case option do
-      ">=" -> length(message.likes) >= count
-      "<=" -> length(message.likes) <= count
-      "=" -> length(message.likes) == count
+      ">=" -> Enum.count(message.likes) >= likes_count
+      "<=" -> Enum.count(message.likes) <= likes_count
+      "=" -> Enum.count(message.likes) == likes_count
     end
   end
 end
