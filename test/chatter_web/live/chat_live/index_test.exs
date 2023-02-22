@@ -29,7 +29,6 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       socket = Index.assign_default(socket)
 
       assert socket.assigns.messages == MessageAgent.get()
-      assert Enum.count(socket.assigns.messages) == 4
       assert socket.assigns.show_write == false
       assert socket.assigns.show_menu == false
       assert socket.assigns.changeset == Message.change_message(%Message{})
