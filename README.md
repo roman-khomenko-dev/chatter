@@ -1,4 +1,4 @@
-# Chatter
+# Chatter [![Coverage Status](https://coveralls.io/repos/github/roman-khomenko-dev/chatter/badge.svg)](https://coveralls.io/github/roman-khomenko-dev/chatter)
 
 To start your Phoenix server:
 

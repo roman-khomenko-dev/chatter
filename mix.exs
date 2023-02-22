@@ -7,11 +7,7 @@ defmodule Chatter.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
-      test_coverage: [
-        summary: [
-          threshold: 70
-        ]
-      ],
+      test_coverage: [tool: ExCoveralls],
       compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -55,7 +51,8 @@ defmodule Chatter.MixProject do
       {:bootstrap_icons, "~> 0.4.0"},
       {:ecto_sql, "~> 3.0"},
       {:phoenix_ecto, "~> 4.0"},
-      {:timex, "~> 3.0"}
+      {:timex, "~> 3.0"},
+      {:excoveralls, "~> 0.15.3", only: :test},
     ]
   end
 
