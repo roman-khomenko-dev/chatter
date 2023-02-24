@@ -56,6 +56,8 @@
                     <%= number_input f, :likes, class: "form-control my-2", "phx-debounce": "800", placeholder: "Expected likes", min: 0%>
                 </div>
             </.form>
+
+        <.live_component module={AdvancedFilterComponent} id="advanced-filter" filter_option={@filter_option} />
         </div>
     </div>
 </div>

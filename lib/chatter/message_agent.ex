@@ -32,6 +32,15 @@ defmodule Chatter.MessageAgent do
     end)
   end
 
+  @spec get_all_likes :: list
+  def get_all_likes() do
+    likes = []
+    Agent.get(__MODULE__, & &1)
+    |> Enum.reduce(likes, fn message, acc ->
+      acc ++ message.likes
+    end)
+  end
+
   defp proceed_like(message, user), do: if Enum.member?(Map.get(message, :likes), user), do: remove_like(message, user), else: push_like(message, user)
 
   defp push_like(message, user) do
