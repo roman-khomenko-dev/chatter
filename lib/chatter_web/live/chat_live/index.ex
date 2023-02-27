@@ -85,7 +85,7 @@ defmodule ChatterWeb.ChatLive.Index do
     |> assign(filter_option: nil)
   end
 
-  defp assign_search_messages(socket) do
+  def assign_search_messages(socket) do
     assign(socket,
       messages:
         socket.assigns.search
@@ -94,15 +94,15 @@ defmodule ChatterWeb.ChatLive.Index do
     )
   end
 
-  defp assign_filter_option_messages(socket) when socket.assigns.filter_option != nil do
+  def assign_filter_option_messages(socket) when socket.assigns.filter_option != nil do
     assign(socket, messages: filter_messages_by_option(socket.assigns.filter_option))
   end
 
-  defp assign_filter_option_messages(socket) when is_nil(socket.assigns.filter_option) do
+  def assign_filter_option_messages(socket) do
     assign_search_messages(socket)
   end
 
-  defp assign_filter_option(socket, option) do
+  def assign_filter_option(socket, option) do
     if socket.assigns.filter_option == option,
       do: assign(socket, filter_option: nil),
       else: assign(socket, filter_option: option)

@@ -18,6 +18,10 @@ defmodule Chatter.MessageAgent do
     Agent.update(__MODULE__, fn(state) -> [message | state] end)
   end
 
+  def clear do
+    Agent.update(__MODULE__, fn(_state) -> [] end)
+  end
+
   def set_like(_pid, {uuid, user}) do
     Agent.update(__MODULE__, fn(state) -> Enum.map(state, fn message ->
       case Map.get(message, :uuid) == uuid do
@@ -33,7 +37,7 @@ defmodule Chatter.MessageAgent do
   end
 
   @spec get_all_likes :: list
-  def get_all_likes() do
+  def get_all_likes do
     likes = []
     Agent.get(__MODULE__, & &1)
     |> Enum.reduce(likes, fn message, acc ->
