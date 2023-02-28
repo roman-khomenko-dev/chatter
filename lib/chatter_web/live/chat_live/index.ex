@@ -147,16 +147,16 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   defp filter_with_likes_who_like do
+    all_likes = MessageAgent.get_all_likes()
     Enum.filter(MessageAgent.get(), fn message ->
-      if Enum.count(message.likes) > 0 && message.author in MessageAgent.get_all_likes(),
-        do: message
+      if Enum.count(message.likes) > 0 && message.author in all_likes, do: message
     end)
   end
 
   defp filter_without_likes_who_never_liked do
+    all_likes = MessageAgent.get_all_likes()
     Enum.filter(MessageAgent.get(), fn message ->
-      if Enum.empty?(message.likes) && message.author not in MessageAgent.get_all_likes(),
-        do: message
+      if Enum.empty?(message.likes) && message.author not in all_likes, do: message
     end)
   end
 
@@ -186,7 +186,6 @@ defmodule ChatterWeb.ChatLive.Index do
   defp messages_with_likes_percent({messages, likes_summary}) do
     messages
     |> Enum.reduce([], fn message, acc ->
-      acc ++
         [
           %{
             uuid: message.uuid,
@@ -194,9 +193,10 @@ defmodule ChatterWeb.ChatLive.Index do
               message.likes
               |> Enum.count()
               |> calculate_likes_percent(likes_summary)
-          }
+          } | acc
         ]
     end)
+    |> Enum.reverse()
   end
 
   defp calculate_likes_percent(message_likes, likes_summary) do

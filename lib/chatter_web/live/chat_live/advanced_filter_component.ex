@@ -11,13 +11,19 @@ defmodule AdvancedFilterComponent do
         Advanced filters
       </button>
       <ul class="dropdown-menu">
-        <li><a class={"dropdown-item #{if @filter_option == :with_likes_who_liked do "active" end}"} phx-click="filter_option" phx-value-option="with_likes_who_liked">
+        <li><a class={
+            classes("dropdown-item", %{"active" => @filter_option == :with_likes_who_liked})
+            } phx-click="filter_option" phx-value-option="with_likes_who_liked">
           with likes of those who has liked other
         </a></li>
-        <li><a class={"dropdown-item #{if @filter_option == :without_likes_who_never_liked do "active" end}"} phx-click="filter_option" phx-value-option="without_likes_who_never_liked">
+        <li><a class={
+          classes("dropdown-item", %{"active" => @filter_option == :without_likes_who_never_liked})
+          } phx-click="filter_option" phx-value-option="without_likes_who_never_liked">
           without likes of those who never liked other
         </a></li>
-        <li><a class={"dropdown-item #{if @filter_option == :with_major_likes do "active" end}"} phx-click="filter_option" phx-value-option="with_major_likes">
+        <li><a class={
+          classes("dropdown-item", %{"active" => @filter_option == :with_major_likes})
+          } phx-click="filter_option" phx-value-option="with_major_likes">
           smallest number of more than 80% of all likes
         </a></li>
       </ul>
