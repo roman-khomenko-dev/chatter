@@ -52,6 +52,17 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   @impl true
+  def handle_event("filter_option", %{"option" => option} = _params, socket) do
+    option = String.to_atom(option)
+
+    {:noreply,
+     socket
+     |> assign_filter_option(option)
+     |> assign_filter_option_messages()
+     |> activate_show("show_menu")}
+  end
+
+  @impl true
   def handle_event("close_menu", _params, socket) do
     {:noreply, assign(socket, show_menu: false)}
   end
@@ -71,15 +82,30 @@ defmodule ChatterWeb.ChatLive.Index do
     |> assign(changeset: Message.change_message(%Message{}))
     |> assign(username: elem(Generator.run(), 1))
     |> assign(search: Search.change_search(%Search{}))
+    |> assign(filter_option: nil)
   end
 
-  defp assign_search_messages(socket) do
+  def assign_search_messages(socket) do
     assign(socket,
       messages:
         socket.assigns.search
         |> apply_changes
         |> get_filtered_messages
     )
+  end
+
+  def assign_filter_option_messages(socket) when socket.assigns.filter_option != nil do
+    assign(socket, messages: filter_messages_by_option(socket.assigns.filter_option))
+  end
+
+  def assign_filter_option_messages(socket) do
+    assign_search_messages(socket)
+  end
+
+  def assign_filter_option(socket, option) do
+    if socket.assigns.filter_option == option,
+      do: assign(socket, filter_option: nil),
+      else: assign(socket, filter_option: option)
   end
 
   defp activate_show(socket, "show_write") do
@@ -110,5 +136,73 @@ defmodule ChatterWeb.ChatLive.Index do
       "<=" -> Enum.count(message.likes) <= likes_count
       "=" -> Enum.count(message.likes) == likes_count
     end
+  end
+
+  defp filter_messages_by_option(option) do
+    case option do
+      :with_likes_who_liked -> filter_with_likes_who_like()
+      :without_likes_who_never_liked -> filter_without_likes_who_never_liked()
+      :with_major_likes -> filter_with_major_likes()
+    end
+  end
+
+  defp filter_with_likes_who_like do
+    all_likes = MessageAgent.get_all_likes()
+    Enum.filter(MessageAgent.get(), fn message ->
+      if Enum.count(message.likes) > 0 && message.author in all_likes, do: message
+    end)
+  end
+
+  defp filter_without_likes_who_never_liked do
+    all_likes = MessageAgent.get_all_likes()
+    Enum.filter(MessageAgent.get(), fn message ->
+      if Enum.empty?(message.likes) && message.author not in all_likes, do: message
+    end)
+  end
+
+  defp filter_with_major_likes do
+    top_messages =
+      {MessageAgent.get(), Enum.count(MessageAgent.get_all_likes())}
+      |> messages_with_likes_percent()
+      |> Enum.sort_by(&Map.fetch(&1, :likes_percent), :desc)
+      |> top_liked_messages()
+
+    Enum.filter(MessageAgent.get(), fn message -> message.uuid in top_messages.uuids end)
+  end
+
+  defp top_liked_messages(messages) do
+    messages
+    |> Enum.reduce_while(%{uuids: [], percent: 0}, fn message_info, acc ->
+      acc = %{
+        acc
+        | uuids: acc.uuids ++ [message_info.uuid],
+          percent: acc.percent + message_info.likes_percent
+      }
+
+      if acc.percent < 80.0, do: {:cont, acc}, else: {:halt, acc}
+    end)
+  end
+
+  defp messages_with_likes_percent({messages, likes_summary}) do
+    messages
+    |> Enum.reduce([], fn message, acc ->
+        [
+          %{
+            uuid: message.uuid,
+            likes_percent:
+              message.likes
+              |> Enum.count()
+              |> calculate_likes_percent(likes_summary)
+          } | acc
+        ]
+    end)
+    |> Enum.reverse()
+  end
+
+  defp calculate_likes_percent(message_likes, likes_summary) do
+    message_likes
+    |> Decimal.div(likes_summary)
+    |> Decimal.to_float()
+    |> Kernel.*(100)
   end
 end

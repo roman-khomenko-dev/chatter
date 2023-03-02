@@ -91,6 +91,7 @@ defmodule ChatterWeb do
 
       # Import LiveView and .heex helpers (live_render, live_patch, <.form>, etc)
       import Phoenix.LiveView.Helpers
+      import ChatWeb.LiveHelpers
 
       # import reusable function components with HEEx templates
       import Phoenix.Component

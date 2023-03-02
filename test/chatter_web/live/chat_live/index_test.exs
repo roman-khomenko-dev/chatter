@@ -1,29 +1,17 @@
 defmodule ChatterWeb.ChatLive.IndexTest do
   use ExUnit.Case
   use ChatterWeb.ConnCase
-  import Phoenix.LiveViewTest
+  import Phoenix.{LiveViewTest, Component}
   alias ChatterWeb.ChatLive.Index
-  alias Chatter.{Message, MessageAgent}
+  alias Chatter.{Message, MessageAgent, Search}
   alias Chatter.UsernameSpace.Generator
 
   defp create_socket(_) do
     %{socket: %Phoenix.LiveView.Socket{}}
   end
 
-  defp create_messages(_) do
-    Enum.each(1..4, fn round ->
-      with {:ok, message} <-
-             Message.create(%{
-               "text" => "Hello " <> Integer.to_string(round),
-               "author" => elem(Generator.run(), 1)
-             }) do
-        MessageAgent.add(message)
-      end
-    end)
-  end
-
   describe "user interaction" do
-    setup [:create_messages, :create_socket]
+    setup [:create_socket]
 
     test "when page load default values provided", %{socket: socket} do
       socket = Index.assign_default(socket)
@@ -33,9 +21,12 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       assert socket.assigns.show_menu == false
       assert socket.assigns.changeset == Message.change_message(%Message{})
       assert socket.assigns.username != nil
+      assert socket.assigns.search == Search.change_search(%Search{})
+      assert socket.assigns.filter_option == nil
     end
 
-    test "user create a message; validate, click like and unlike", %{socket: socket, conn: conn} do
+    test "message validation, likes operation and search goes right", %{socket: socket, conn: conn} do
+      MessageAgent.clear()
       socket = Index.assign_default(socket)
       {:ok, view, _html} = live(conn, "/")
 
@@ -53,7 +44,62 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       assert List.first(MessageAgent.get()).likes == [socket.assigns.username]
 
       render_click(view, :like, %{"uuid" => message.uuid, "user" => socket.assigns.username})
-      assert List.first(MessageAgent.get()).likes == []
+      assert MessageAgent.get_all_likes() == []
+
+      view
+      |> form("#message-form", %{message: %{"text" => "Hello"}})
+      |> render_submit()
+
+      socket = assign(socket, messages: MessageAgent.get())
+      assert Enum.count(socket.assigns.messages) == 2
+
+      search = Search.change_search(%Search{text: "Greet", likes_option: "=", likes: 0})
+      socket =
+        socket
+        |> assign(search: search)
+        |> Index.assign_search_messages()
+      assert Enum.count(socket.assigns.messages) == 1
+    end
+
+    test "using the advanced message filter happens correctly", %{socket: socket, conn: conn} do
+      MessageAgent.clear()
+      socket = Index.assign_default(socket)
+      {:ok, view, _html} = live(conn, "/")
+
+
+      Enum.each(1..5, fn step ->
+        view
+        |> form("#message-form", %{message: %{"text" => "Message #{step}", author: elem(Generator.run(), 1)}})
+        |> render_submit()
+      end)
+
+      message_authors = Enum.map(MessageAgent.get(), fn message -> %{uuid: message.uuid, author: message.author} end)
+
+      socket = assign(socket, messages: MessageAgent.get())
+      render_click(view, :like, %{"uuid" => Enum.at(message_authors, 0).uuid, "user" => Enum.at(message_authors, 1).author})
+      render_click(view, :like, %{"uuid" => Enum.at(message_authors, 1).uuid, "user" => Enum.at(message_authors, 0).author})
+
+      socket =
+        socket
+        |> Index.assign_filter_option(:with_likes_who_liked)
+        |> Index.assign_filter_option_messages()
+      assert Enum.count(socket.assigns.messages) == 2
+
+      socket =
+        socket
+        |> Index.assign_filter_option(:without_likes_who_never_liked)
+        |> Index.assign_filter_option_messages()
+      assert Enum.count(socket.assigns.messages) == 3
+
+      Enum.each(2..4, fn message_index ->
+        render_click(view, :like, %{"uuid" => Enum.at(message_authors, 1).uuid, "user" => Enum.at(message_authors, message_index).author})
+      end)
+
+      socket =
+        socket
+        |> Index.assign_filter_option(:with_major_likes)
+        |> Index.assign_filter_option_messages()
+      assert Enum.count(socket.assigns.messages) == 1
     end
   end
 end
