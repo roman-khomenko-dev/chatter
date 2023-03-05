@@ -18,29 +18,8 @@
             </.form>
         </div>
     </div>
-    <%= for message <- @messages do %>
-        <div class="card col-10 mx-auto d-block my-5 shadow mb-5 bg-white rounded">
-            <div class="card-body">
-                <p class="card-text">
-                    <%= message.text %>
-                </p>
-            </div>
-            <div class="card-footer">
-                <small class="text-muted row">
-                   <span class="col col-sm">
-                        Written at <%= elem(Timex.format(message.timestamp, "%Y-%m-%d %H:%M:%S", :strftime),1) %> by
-                        <%= "<#{message.author}>" %>
-                    </span>
-                    <span class="col col-1">
-                        <a id={"like-#{message.uuid}"} class="like-icon ms-2" phx-value-uuid={message.uuid} phx-value-user={@username} data-toggle="tooltip" data-placement="top" title={Enum.map(message.likes, fn like -> like <> "\n" end)} phx-update="ignore" phx-click="like">
-                            <%= Bootstrap.Icons.star_fill()%>
-                        </a>
-                        <%= length(message.likes) %>
-                    </span>
-                </small>
-            </div>
-        </div>
-    <% end %>
+
+    <.live_component module={MessageComponent} id="messages-container" username={@username} messages={@streams.messages} />
 
     <div class={"offcanvas offcanvas-start #{if @show_menu do "show" end}"} data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="menu" aria-labelledby="App menu">
         <div class="offcanvas-header">

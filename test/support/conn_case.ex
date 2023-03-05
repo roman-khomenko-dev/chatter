@@ -28,6 +28,8 @@ defmodule ChatterWeb.ConnCase do
 
       # The default endpoint for testing
       @endpoint ChatterWeb.Endpoint
+
+      use ChatterWeb, :verified_routes
     end
   end
 

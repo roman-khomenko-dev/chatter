@@ -14,6 +14,10 @@ defmodule Chatter.MessageAgent do
     Agent.get(__MODULE__, & &1)
   end
 
+  def get_by_id(id) do
+    Enum.filter(get(), fn message -> message.id == id end)
+  end
+
   def add(message) do
     Agent.update(__MODULE__, fn(state) -> [message | state] end)
   end
@@ -22,9 +26,9 @@ defmodule Chatter.MessageAgent do
     Agent.update(__MODULE__, fn(_state) -> [] end)
   end
 
-  def set_like(_pid, {uuid, user}) do
+  def set_like(_pid, {id, user}) do
     Agent.update(__MODULE__, fn(state) -> Enum.map(state, fn message ->
-      case Map.get(message, :uuid) == uuid do
+      case Map.get(message, :id) == id do
         true ->
           message
           |> proceed_like(user)
