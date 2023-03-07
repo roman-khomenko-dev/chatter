@@ -144,7 +144,7 @@ defmodule ChatterWeb.ChatLive.Index do
       else: assign(socket, filter_option: option)
   end
 
-  defp apply_search(socket), do: apply_changes(socket.assigns.search)
+  def apply_search(socket), do: apply_changes(socket.assigns.search)
 
   defp activate_show(socket, "show_write") do
     if socket.assigns.show_write == false, do: assign(socket, show_write: true), else: socket
