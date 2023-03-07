@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    <.live_component module={MessageComponent} id="messages-container" username={@username} messages={@streams.messages} />
+    <.live_component module={MessagesComponent} id="messages-container" username={@username} messages={@streams.messages} />
 
     <div class={"offcanvas offcanvas-start #{if @show_menu do "show" end}"} data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="menu" aria-labelledby="App menu">
         <div class="offcanvas-header">

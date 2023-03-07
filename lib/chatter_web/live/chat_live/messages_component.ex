@@ -1,4 +1,4 @@
-defmodule MessageComponent do
+defmodule MessagesComponent do
   @moduledoc """
   Define message component
   """

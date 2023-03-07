@@ -7,14 +7,18 @@ defmodule ChatterWeb.ChatLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Message.subscribe_global()
-    socket = assign_default(socket)
+    socket =
+      socket
+      |> assign_default()
+      |> assign_messages()
+
     subscribe_local_messages(socket)
     {:ok, socket}
   end
 
   @impl true
   def handle_info({Message, {:message, :created}, message}, socket) do
-    {message, socket.assigns.filter_option, socket} |> created_response()
+    {message, socket} |> created_response()
   end
 
   @impl true
@@ -55,8 +59,8 @@ defmodule ChatterWeb.ChatLive.Index do
   @impl true
   def handle_event("search", %{"search" => params}, socket) do
     with {:ok, search} <- Search.create(params),
-      filtered_messages <- get_filtered_messages(search) do
-      broadcast_filtered_message(socket.assigns.username, filtered_messages)
+      search_messages <- user_shown_messages({search, socket}) do
+      broadcast_filtered_message(search_messages, socket.assigns.username)
 
       {:noreply,
        socket
@@ -67,15 +71,17 @@ defmodule ChatterWeb.ChatLive.Index do
 
   @impl true
   def handle_event("filter_option", %{"option" => option} = _params, socket) do
-    option = String.to_atom(option)
+    {option, search} = {String.to_atom(option), apply_search(socket)}
 
     socket =
       socket
       |> assign_filter_option(option)
       |> activate_show("show_menu")
 
-    filtered_messages = filter_messages_by_option(socket)
-    broadcast_filtered_message(socket.assigns.username, filtered_messages)
+    {search, socket}
+    |> user_shown_messages()
+    |> broadcast_filtered_message(socket.assigns.username)
+
     {:noreply, socket}
   end
 
@@ -95,15 +101,23 @@ defmodule ChatterWeb.ChatLive.Index do
     socket
     |> assign(show_write: false)
     |> assign(show_menu: false)
-    |> stream(:messages, MessageAgent.get())
     |> assign(changeset: Message.change_message(%Message{}))
     |> assign(username: elem(Generator.run(), 1))
     |> assign(:search, Search.change_search(%Search{}))
     |> assign(filter_option: nil)
   end
 
-  defp created_response({message, filter_option, socket}) do
-    is_member = Enum.member?(user_shown_messages({filter_option, socket}), message)
+  def assign_messages(socket) do
+    stream(socket, :messages, MessageAgent.get())
+  end
+
+  defp created_response({message, socket}) do
+    search = apply_changes(socket.assigns.search)
+    is_member =
+      {search, socket}
+      |> user_shown_messages()
+      |> Enum.member?(message)
+
     {is_member, message, socket} |> created_member_response()
   end
 
@@ -111,20 +125,17 @@ defmodule ChatterWeb.ChatLive.Index do
 
   defp created_member_response({true, message, socket}), do: {:noreply, stream_insert(socket, :messages, message, at: 0)}
 
-  def user_shown_messages({_filter_option = nil, socket}), do: get_search_messages(socket)
+  def user_shown_messages({search, %{assigns: %{filter_option: nil}}} = _socket), do: get_search_messages(search)
 
-  def user_shown_messages({_filter_option, socket}), do: filter_messages_by_option(socket)
-
-  def get_search_messages(socket) do
-    socket.assigns.search
-      |> apply_changes
-      |> get_filtered_messages
+  def user_shown_messages({search, %{assigns: %{filter_option: _filter_option}} = socket}) do
+    search_messages = get_search_messages(search)
+      socket
+      |> filter_messages_by_option()
+      |> Enum.filter(fn message -> message in search_messages end)
   end
 
-  def assign_filter_option_messages(socket) when socket.assigns.filter_option != nil, do: get_search_messages(socket)
-
-  def assign_filter_option_messages(socket) do
-    assign(socket, messages: filter_messages_by_option(socket.assigns.filter_option))
+  def get_search_messages(search) do
+    Enum.filter(MessageAgent.get(), &filter_message(&1, search))
   end
 
   def assign_filter_option(socket, option) do
@@ -133,16 +144,14 @@ defmodule ChatterWeb.ChatLive.Index do
       else: assign(socket, filter_option: option)
   end
 
+  defp apply_search(socket), do: apply_changes(socket.assigns.search)
+
   defp activate_show(socket, "show_write") do
     if socket.assigns.show_write == false, do: assign(socket, show_write: true), else: socket
   end
 
   defp activate_show(socket, "show_menu") do
     if socket.assigns.show_menu == false, do: assign(socket, show_menu: true), else: socket
-  end
-
-  defp get_filtered_messages(search) do
-    Enum.filter(MessageAgent.get(), &filter_message(&1, search))
   end
 
   defp filter_message(message, search) do
@@ -232,7 +241,7 @@ defmodule ChatterWeb.ChatLive.Index do
     |> Kernel.*(100)
   end
 
-  defp broadcast_filtered_message(username, filtered_messages) do
+  defp broadcast_filtered_message(filtered_messages, username) do
     Enum.each(MessageAgent.get(), fn message ->
       if message_in_filtered?(message, filtered_messages), do: broadcast_updated(message, username), else: broadcast_removed(message, username)
     end)

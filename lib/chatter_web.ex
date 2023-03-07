@@ -17,7 +17,7 @@ defmodule ChatterWeb do
   and import those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
+  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt username_space)
 
   def controller do
     quote do
