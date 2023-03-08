@@ -3,7 +3,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
   use ChatterWeb.ConnCase
   import Phoenix.{LiveViewTest, Component}
   alias ChatterWeb.ChatLive.Index
-  alias Chatter.{Message, MessageAgent, Search}
+  alias Chatter.{Message, MessageAgent, MessageFilter, Search}
   alias Chatter.UsernameSpace.Generator
 
   defp create_socket(_) do
@@ -92,7 +92,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
 
   defp shown_filter_messages(params) do
     params
-      |> Index.user_shown_messages()
+      |> MessageFilter.filter_by_params()
       |> Enum.count()
   end
 end
