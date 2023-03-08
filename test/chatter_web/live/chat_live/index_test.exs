@@ -54,7 +54,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
 
       search = Search.change_search(%Search{text: "Greet", likes_option: "=", likes: 0})
       socket = assign(socket, search: search)
-      assert {Index.apply_search(socket), socket} |> shown_filter_messages() == 1
+      assert {Index.apply_search(socket), socket.assigns.filter_option} |> shown_filter_messages() == 1
     end
 
     test "using the advanced message filter happens correctly", %{socket: socket, conn: conn} do
@@ -76,17 +76,17 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       render_click(view, :like, %{"id" => Integer.to_string(Enum.at(message_authors, 1).id), "user" => Enum.at(message_authors, 0).author})
 
       socket = Index.assign_filter_option(socket, :with_likes_who_liked)
-      assert {Index.apply_search(socket), socket} |> shown_filter_messages() == 2
+      assert {Index.apply_search(socket), :with_likes_who_liked} |> shown_filter_messages() == 2
 
       socket = Index.assign_filter_option(socket, :without_likes_who_never_liked)
-      assert {Index.apply_search(socket), socket} |> shown_filter_messages() == 3
+      assert {Index.apply_search(socket), :without_likes_who_never_liked} |> shown_filter_messages() == 3
 
       Enum.each(2..4, fn message_index ->
         render_click(view, :like, %{"id" => Integer.to_string(Enum.at(message_authors, 1).id), "user" => Enum.at(message_authors, message_index).author})
       end)
 
       socket = Index.assign_filter_option(socket, :with_major_likes)
-      assert {Index.apply_search(socket), socket} |> shown_filter_messages() == 1
+      assert {Index.apply_search(socket), :with_major_likes} |> shown_filter_messages() == 1
     end
   end
 
