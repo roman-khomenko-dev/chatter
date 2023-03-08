@@ -59,7 +59,7 @@ defmodule ChatterWeb.ChatLive.Index do
   @impl true
   def handle_event("search", %{"search" => params}, socket) do
     with {:ok, search} <- Search.create(params),
-      search_messages <- user_shown_messages({search, socket}) do
+      search_messages <- user_shown_messages({search, socket.assigns.filter_option}) do
       broadcast_filtered_message(search_messages, socket.assigns.username)
 
       {:noreply,
@@ -70,17 +70,17 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   @impl true
-  def handle_event("filter_option", %{"option" => option} = _params, socket) do
-    {option, search} = {String.to_atom(option), apply_search(socket)}
+  def handle_event("filter_option", %{"option" => option} = _params, %{assigns: %{username: username}} = socket) do
+    {option, search} = {String.to_existing_atom(option), apply_search(socket)}
 
     socket =
       socket
       |> assign_filter_option(option)
       |> activate_show("show_menu")
 
-    {search, socket}
+    {search, socket.assigns.filter_option}
     |> user_shown_messages()
-    |> broadcast_filtered_message(socket.assigns.username)
+    |> broadcast_filtered_message(username)
 
     {:noreply, socket}
   end
@@ -114,7 +114,7 @@ defmodule ChatterWeb.ChatLive.Index do
   defp created_response({message, socket}) do
     search = apply_changes(socket.assigns.search)
     is_member =
-      {search, socket}
+      {search, socket.assigns.filter_option}
       |> user_shown_messages()
       |> Enum.member?(message)
 
@@ -125,11 +125,11 @@ defmodule ChatterWeb.ChatLive.Index do
 
   defp created_member_response({true, message, socket}), do: {:noreply, stream_insert(socket, :messages, message, at: 0)}
 
-  def user_shown_messages({search, %{assigns: %{filter_option: nil}}} = _socket), do: get_search_messages(search)
+  def user_shown_messages({search, nil = _filter_option}), do: get_search_messages(search)
 
-  def user_shown_messages({search, %{assigns: %{filter_option: _filter_option}} = socket}) do
+  def user_shown_messages({search, filter_option}) do
     search_messages = get_search_messages(search)
-      socket
+    filter_option
       |> filter_messages_by_option()
       |> Enum.filter(fn message -> message in search_messages end)
   end
@@ -172,12 +172,11 @@ defmodule ChatterWeb.ChatLive.Index do
     end
   end
 
-  defp filter_messages_by_option(socket) do
-    case socket.assigns.filter_option do
+  defp filter_messages_by_option(filter_option) do
+    case filter_option do
       :with_likes_who_liked -> filter_with_likes_who_like()
       :without_likes_who_never_liked -> filter_without_likes_who_never_liked()
       :with_major_likes -> filter_with_major_likes()
-      nil -> get_search_messages(socket)
     end
   end
 
@@ -233,6 +232,8 @@ defmodule ChatterWeb.ChatLive.Index do
     end)
     |> Enum.reverse()
   end
+
+  defp calculate_likes_percent(_message_likes, 0 = _likes_summary), do: 0
 
   defp calculate_likes_percent(message_likes, likes_summary) do
     message_likes
