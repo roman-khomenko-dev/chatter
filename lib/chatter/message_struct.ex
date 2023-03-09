@@ -1,4 +1,4 @@
-defmodule Chatter.Message do
+defmodule Chatter.MessageStruct do
   @moduledoc """
   Describing of Message model
   """
@@ -32,12 +32,12 @@ defmodule Chatter.Message do
     |> validate_length(:text, min: 3, max: 100)
   end
 
-  def change_message(%Chatter.Message{} = message, attrs \\ %{}) do
-    Chatter.Message.changeset(message, attrs)
+  def change_message(%Chatter.MessageStruct{} = message, attrs \\ %{}) do
+    Chatter.MessageStruct.changeset(message, attrs)
   end
 
   def create(params) do
-    with message <- %Chatter.Message{id: Enum.count(MessageAgent.get()) + 1, text: params["text"], timestamp: Timex.now(), author: params["author"]} do
+    with message <- %Chatter.MessageStruct{id: Enum.count(MessageAgent.get()) + 1, text: params["text"], timestamp: Timex.now(), author: params["author"]} do
       broadcast_change({:ok, message}, {:message, :created})
       {:ok, message}
     end

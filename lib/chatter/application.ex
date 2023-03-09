@@ -10,6 +10,8 @@ defmodule Chatter.Application do
     children = [
       # Start the Telemetry supervisor
       ChatterWeb.Telemetry,
+      # Start the Ecto repository
+      Chatter.Repo,
       # Start the PubSub system
       {Phoenix.PubSub, name: Chatter.PubSub},
       # Start the Endpoint (http/https)

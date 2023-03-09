@@ -3,11 +3,21 @@ defmodule Chatter.MessageFilter do
   Describe messages filtering functionality
   """
 
-  alias Chatter.{MessageAgent, Search}
+  alias Chatter.{Messages, MessageAgent, Search}
 
-  def filter_by_params({search, nil = _filter_option}), do: get_search_messages(search)
+  def filter_by_params({search, nil = _filter_option, :id = _mode}), do: Enum.map(get_search_messages(search), fn message -> message.id end)
 
-  def filter_by_params({search, filter_option}) do
+  def filter_by_params({search, nil = _filter_option, :full = _mode }), do: get_search_messages(search)
+
+  def filter_by_params({search, filter_option, :id = __mode}) do
+    search_messages = get_search_messages(search)
+    filter_option
+      |> filter_by_option()
+      |> Enum.filter(fn message -> message in search_messages end)
+      |> Enum.map(fn message -> message.id end)
+  end
+
+  def filter_by_params({search, filter_option, :full = __mode}) do
     search_messages = get_search_messages(search)
     filter_option
       |> filter_by_option()
@@ -22,7 +32,9 @@ defmodule Chatter.MessageFilter do
     end
   end
 
-  def get_search_messages(search), do: Enum.filter(MessageAgent.get(), &filter(&1, search))
+  def get_search_messages(search), do: Enum.filter(Messages.list_messages(), &filter(&1, search))
+
+  def filter(message, %Chatter.Search{text: nil, likes: nil} = _search), do: message
 
   def filter(message, search) do
     filter_text(message, search) && filter_likes(message, search)
@@ -44,26 +56,26 @@ defmodule Chatter.MessageFilter do
 
   defp filter_with_likes_who_like do
     all_likes = MessageAgent.get_all_likes()
-    Enum.filter(MessageAgent.get(), fn message ->
+    Enum.filter(Messages.list_messages(), fn message ->
       if Enum.count(message.likes) > 0 && message.author in all_likes, do: message
     end)
   end
 
   defp filter_without_likes_who_never_liked do
     all_likes = MessageAgent.get_all_likes()
-    Enum.filter(MessageAgent.get(), fn message ->
+    Enum.filter(Messages.list_messages(), fn message ->
       if Enum.empty?(message.likes) && message.author not in all_likes, do: message
     end)
   end
 
   defp filter_with_major_likes do
     top_messages =
-      {MessageAgent.get(), Enum.count(MessageAgent.get_all_likes())}
+      {Messages.list_messages(), Enum.count(MessageAgent.get_all_likes())}
       |> with_likes_percent()
       |> Enum.sort_by(&Map.fetch(&1, :likes_percent), :desc)
       |> top_liked()
 
-    Enum.filter(MessageAgent.get(), fn message -> message.id in top_messages.ids end)
+    Enum.filter(Messages.list_messages(), fn message -> message.id in top_messages.ids end)
   end
 
   defp top_liked(messages) do

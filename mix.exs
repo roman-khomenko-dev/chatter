@@ -54,7 +54,8 @@ defmodule Chatter.MixProject do
       {:phoenix_ecto, "~> 4.0"},
       {:timex, "~> 3.0"},
       {:excoveralls, "~> 0.15.3", only: :test},
-      {:decimal, "~> 2.0"}
+      {:decimal, "~> 2.0"},
+      {:postgrex, "~> 0.16.5"}
     ]
   end
 
