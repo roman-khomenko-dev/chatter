@@ -6,9 +6,9 @@ defmodule Chatter.Messages.Message do
   import Ecto.Changeset
 
   schema "messages" do
-    field :author, :string
-    field :likes, {:array, :string}
-    field :text, :string
+    field(:author, :string)
+    field(:likes, {:array, :string})
+    field(:text, :string)
 
     timestamps()
   end

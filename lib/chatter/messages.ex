@@ -4,7 +4,7 @@ defmodule Chatter.Messages do
   """
 
   import Ecto.Query, warn: false
-  alias Chatter.{Repo, Messages.Message}
+  alias Chatter.{Messages.Message, Repo}
 
   @topic inspect(__MODULE__)
 
@@ -18,7 +18,7 @@ defmodule Chatter.Messages do
 
   """
   def list_messages do
-    (from m in Message, as: :message, order_by: [desc: :id])
+    from(m in Message, as: :message, order_by: [desc: :id])
     |> Repo.all()
   end
 
@@ -111,7 +111,9 @@ defmodule Chatter.Messages do
     Phoenix.PubSub.subscribe(Chatter.PubSub, "#{username}-messages")
   end
 
-  def broadcast_change({:ok, result}, event, topic \\ @topic) do
+  def broadcast_change(result, event, topic \\ @topic)
+
+  def broadcast_change({:ok, result}, event, topic) do
     Phoenix.PubSub.broadcast(Chatter.PubSub, topic, {__MODULE__, event, result})
     {:ok, result}
   end

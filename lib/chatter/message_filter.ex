@@ -3,32 +3,38 @@ defmodule Chatter.MessageFilter do
   Describe messages filtering functionality
   """
 
-  alias Chatter.{Messages, MessageAgent, Search}
+  alias Chatter.{Messages, Search}
 
-  def filter_by_params({search, nil = _filter_option, :id = _mode}), do: Enum.map(get_search_messages(search), fn message -> message.id end)
+  def filter_by_params({search, nil = _filter_option, :id = _mode}, _messages_data),
+    do: Enum.map(get_search_messages(search), fn message -> message.id end)
 
-  def filter_by_params({search, nil = _filter_option, :full = _mode }), do: get_search_messages(search)
+  def filter_by_params({search, nil = _filter_option, :full = _mode}, _messages_data),
+    do: get_search_messages(search)
 
-  def filter_by_params({search, filter_option, :id = __mode}) do
-    search_messages = get_search_messages(search)
-    filter_option
-      |> filter_by_option()
-      |> Enum.filter(fn message -> message in search_messages end)
-      |> Enum.map(fn message -> message.id end)
+  def filter_by_params({search, filter_option, :id = __mode}, {messages, all_likes}) do
+    {search, filter_option, :full}
+    |> filter_by_params({messages, all_likes})
+    |> Enum.map(fn message -> message.id end)
   end
 
-  def filter_by_params({search, filter_option, :full = __mode}) do
+  def filter_by_params({search, filter_option, :full = __mode}, {messages, all_likes}) do
     search_messages = get_search_messages(search)
-    filter_option
-      |> filter_by_option()
-      |> Enum.filter(fn message -> message in search_messages end)
+
+    {filter_option, {messages, all_likes}}
+    |> filter_by_option()
+    |> Enum.filter(fn message -> message in search_messages end)
   end
 
-  def filter_by_option(filter_option) do
+  def filter_by_option({filter_option, {messages, all_likes}}) do
     case filter_option do
-      :with_likes_who_liked -> filter_with_likes_who_like()
-      :without_likes_who_never_liked -> filter_without_likes_who_never_liked()
-      :with_major_likes -> filter_with_major_likes()
+      :with_likes_who_liked ->
+        filter_with_likes_who_like({messages, all_likes})
+
+      :without_likes_who_never_liked ->
+        filter_without_likes_who_never_liked({messages, all_likes})
+
+      :with_major_likes ->
+        filter_with_major_likes({messages, all_likes})
     end
   end
 
@@ -54,28 +60,26 @@ defmodule Chatter.MessageFilter do
     end
   end
 
-  defp filter_with_likes_who_like do
-    all_likes = MessageAgent.get_all_likes()
-    Enum.filter(Messages.list_messages(), fn message ->
-      if Enum.count(message.likes) > 0 && message.author in all_likes, do: message
+  defp filter_with_likes_who_like({messages, all_likes}) do
+    Enum.filter(messages, fn message ->
+      if !Enum.empty?(message.likes) && message.author in all_likes, do: message
     end)
   end
 
-  defp filter_without_likes_who_never_liked do
-    all_likes = MessageAgent.get_all_likes()
-    Enum.filter(Messages.list_messages(), fn message ->
+  defp filter_without_likes_who_never_liked({messages, all_likes}) do
+    Enum.filter(messages, fn message ->
       if Enum.empty?(message.likes) && message.author not in all_likes, do: message
     end)
   end
 
-  defp filter_with_major_likes do
+  defp filter_with_major_likes({messages, all_likes}) do
     top_messages =
-      {Messages.list_messages(), Enum.count(MessageAgent.get_all_likes())}
+      {messages, all_likes}
       |> with_likes_percent()
       |> Enum.sort_by(&Map.fetch(&1, :likes_percent), :desc)
       |> top_liked()
 
-    Enum.filter(Messages.list_messages(), fn message -> message.id in top_messages.ids end)
+    Enum.filter(messages, fn message -> message.id in top_messages.ids end)
   end
 
   defp top_liked(messages) do
@@ -94,15 +98,16 @@ defmodule Chatter.MessageFilter do
   defp with_likes_percent({messages, likes_summary}) do
     messages
     |> Enum.reduce([], fn message, acc ->
-        [
-          %{
-            id: message.id,
-            likes_percent:
-              message.likes
-              |> Enum.count()
-              |> calculate_likes_percent(likes_summary)
-          } | acc
-        ]
+      [
+        %{
+          id: message.id,
+          likes_percent:
+            message.likes
+            |> Enum.count()
+            |> calculate_likes_percent(likes_summary)
+        }
+        | acc
+      ]
     end)
     |> Enum.reverse()
   end

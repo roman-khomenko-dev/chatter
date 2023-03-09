@@ -10,9 +10,7 @@ defmodule Chatter.MessagesFixtures do
   def message_fixture(attrs \\ %{}) do
     {:ok, message} =
       attrs
-      |> Enum.into(%{
-
-      })
+      |> Enum.into(%{})
       |> Chatter.Messages.create_message()
 
     message
