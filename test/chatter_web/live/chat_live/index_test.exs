@@ -3,7 +3,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
   use ChatterWeb.ConnCase
   import Phoenix.{LiveViewTest, Component}
   alias ChatterWeb.ChatLive.Index
-  alias Chatter.{Message, MessageAgent, Search}
+  alias Chatter.{Message, MessageAgent, MessageFilter, Search}
   alias Chatter.UsernameSpace.Generator
 
   defp create_socket(_) do
@@ -16,16 +16,18 @@ defmodule ChatterWeb.ChatLive.IndexTest do
     test "when page load default values provided", %{socket: socket} do
       socket = Index.assign_default(socket)
 
-      assert socket.assigns.messages == MessageAgent.get()
       assert socket.assigns.show_write == false
       assert socket.assigns.show_menu == false
       assert socket.assigns.changeset == Message.change_message(%Message{})
       assert socket.assigns.username != nil
       assert socket.assigns.search == Search.change_search(%Search{})
-      assert socket.assigns.filter_option == nil
+      assert Index.apply_search(socket) == %Chatter.Search{}
     end
 
-    test "message validation, likes operation and search goes right", %{socket: socket, conn: conn} do
+    test "message validation, likes operation and search goes right", %{
+      socket: socket,
+      conn: conn
+    } do
       MessageAgent.clear()
       socket = Index.assign_default(socket)
       {:ok, view, _html} = live(conn, "/")
@@ -40,10 +42,18 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       message = List.first(MessageAgent.get())
       assert message.text == "Greetings"
 
-      render_click(view, :like, %{"uuid" => message.uuid, "user" => socket.assigns.username})
+      render_click(view, :like, %{
+        "id" => Integer.to_string(message.id),
+        "user" => socket.assigns.username
+      })
+
       assert List.first(MessageAgent.get()).likes == [socket.assigns.username]
 
-      render_click(view, :like, %{"uuid" => message.uuid, "user" => socket.assigns.username})
+      render_click(view, :like, %{
+        "id" => Integer.to_string(message.id),
+        "user" => socket.assigns.username
+      })
+
       assert MessageAgent.get_all_likes() == []
 
       view
@@ -54,11 +64,12 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       assert Enum.count(socket.assigns.messages) == 2
 
       search = Search.change_search(%Search{text: "Greet", likes_option: "=", likes: 0})
-      socket =
-        socket
-        |> assign(search: search)
-        |> Index.assign_search_messages()
-      assert Enum.count(socket.assigns.messages) == 1
+      socket = assign(socket, search: search)
+
+      {messages, all_likes} = {MessageAgent.get(), MessageAgent.get_all_likes()}
+
+      assert {Index.apply_search(socket), socket.assigns.filter_option}
+             |> shown_filter_messages({messages, all_likes}) == 1
     end
 
     test "using the advanced message filter happens correctly", %{socket: socket, conn: conn} do
@@ -66,40 +77,58 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       socket = Index.assign_default(socket)
       {:ok, view, _html} = live(conn, "/")
 
-
       Enum.each(1..5, fn step ->
         view
-        |> form("#message-form", %{message: %{"text" => "Message #{step}", author: elem(Generator.run(), 1)}})
+        |> form("#message-form", %{
+          message: %{"text" => "Message #{step}", author: elem(Generator.run(), 1)}
+        })
         |> render_submit()
       end)
 
-      message_authors = Enum.map(MessageAgent.get(), fn message -> %{uuid: message.uuid, author: message.author} end)
+      message_authors =
+        Enum.map(MessageAgent.get(), fn message -> %{id: message.id, author: message.author} end)
 
       socket = assign(socket, messages: MessageAgent.get())
-      render_click(view, :like, %{"uuid" => Enum.at(message_authors, 0).uuid, "user" => Enum.at(message_authors, 1).author})
-      render_click(view, :like, %{"uuid" => Enum.at(message_authors, 1).uuid, "user" => Enum.at(message_authors, 0).author})
 
-      socket =
-        socket
-        |> Index.assign_filter_option(:with_likes_who_liked)
-        |> Index.assign_filter_option_messages()
-      assert Enum.count(socket.assigns.messages) == 2
+      render_click(view, :like, %{
+        "id" => Integer.to_string(Enum.at(message_authors, 0).id),
+        "user" => Enum.at(message_authors, 1).author
+      })
 
-      socket =
-        socket
-        |> Index.assign_filter_option(:without_likes_who_never_liked)
-        |> Index.assign_filter_option_messages()
-      assert Enum.count(socket.assigns.messages) == 3
+      render_click(view, :like, %{
+        "id" => Integer.to_string(Enum.at(message_authors, 1).id),
+        "user" => Enum.at(message_authors, 0).author
+      })
+
+      {messages, all_likes} = {MessageAgent.get(), MessageAgent.get_all_likes()}
+
+      socket = Index.assign_filter_option(socket, :with_likes_who_liked)
+
+      assert {Index.apply_search(socket), :with_likes_who_liked}
+             |> shown_filter_messages({messages, all_likes}) == 2
+
+      socket = Index.assign_filter_option(socket, :without_likes_who_never_liked)
+
+      assert {Index.apply_search(socket), :without_likes_who_never_liked}
+             |> shown_filter_messages({messages, all_likes}) == 3
 
       Enum.each(2..4, fn message_index ->
-        render_click(view, :like, %{"uuid" => Enum.at(message_authors, 1).uuid, "user" => Enum.at(message_authors, message_index).author})
+        render_click(view, :like, %{
+          "id" => Integer.to_string(Enum.at(message_authors, 1).id),
+          "user" => Enum.at(message_authors, message_index).author
+        })
       end)
 
-      socket =
-        socket
-        |> Index.assign_filter_option(:with_major_likes)
-        |> Index.assign_filter_option_messages()
-      assert Enum.count(socket.assigns.messages) == 1
+      socket = Index.assign_filter_option(socket, :with_major_likes)
+
+      assert {Index.apply_search(socket), :with_major_likes}
+             |> shown_filter_messages({messages, all_likes}) == 1
     end
+  end
+
+  defp shown_filter_messages(params, messages) do
+    params
+    |> MessageFilter.filter_by_params(messages)
+    |> Enum.count()
   end
 end

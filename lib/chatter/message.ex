@@ -2,23 +2,31 @@ defmodule Chatter.Message do
   @moduledoc """
   Describing of Message model
   """
-  import Ecto.{Changeset, UUID}
+  alias Chatter.MessageAgent
+  import Ecto.Changeset
 
-  @types %{uuid: :string, text: :string, timestamp: DateTime, author: :string, likes: :array}
-  defstruct [:uuid, :text, :timestamp, :author, likes: []]
+  @types %{id: :string, text: :string, timestamp: DateTime, author: :string, likes: :array}
+  @derive Jason.Encoder
+  defstruct [:id, :text, :timestamp, :author, likes: []]
 
   @topic inspect(__MODULE__)
 
-  def subscribe do
+  def subscribe_global do
     Phoenix.PubSub.subscribe(Chatter.PubSub, @topic)
   end
 
-  def broadcast_change({:ok, result}, event) do
-    Phoenix.PubSub.broadcast(Chatter.PubSub, @topic, {__MODULE__, event, result})
+  def subscribe_local(username) do
+    Phoenix.PubSub.subscribe(Chatter.PubSub, "#{username}-messages")
+  end
+
+  def broadcast_change(result, event, topic \\ @topic)
+
+  def broadcast_change({:ok, result}, event, topic) do
+    Phoenix.PubSub.broadcast(Chatter.PubSub, topic, {__MODULE__, event, result})
     {:ok, result}
   end
 
-  def broadcast_change({:error, changeset}, _event), do: {:error, changeset}
+  def broadcast_change({:error, changeset}, _event, _topic), do: {:error, changeset}
 
   def changeset(struct, params) do
     {struct, @types}
@@ -31,7 +39,12 @@ defmodule Chatter.Message do
   end
 
   def create(params) do
-    with message <- %Chatter.Message{uuid: Ecto.UUID.generate(), text: params["text"], timestamp: Timex.now(), author: params["author"]} do
+    with message <- %Chatter.Message{
+           id: Enum.count(MessageAgent.get()) + 1,
+           text: params["text"],
+           timestamp: Timex.now(),
+           author: params["author"]
+         } do
       broadcast_change({:ok, message}, {:message, :created})
       {:ok, message}
     end
