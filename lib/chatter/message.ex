@@ -19,7 +19,9 @@ defmodule Chatter.Message do
     Phoenix.PubSub.subscribe(Chatter.PubSub, "#{username}-messages")
   end
 
-  def broadcast_change({:ok, result}, event, topic \\ @topic) do
+  def broadcast_change(result, event, topic \\ @topic)
+
+  def broadcast_change({:ok, result}, event, topic) do
     Phoenix.PubSub.broadcast(Chatter.PubSub, topic, {__MODULE__, event, result})
     {:ok, result}
   end
@@ -37,7 +39,12 @@ defmodule Chatter.Message do
   end
 
   def create(params) do
-    with message <- %Chatter.Message{id: Enum.count(MessageAgent.get()) + 1, text: params["text"], timestamp: Timex.now(), author: params["author"]} do
+    with message <- %Chatter.Message{
+           id: Enum.count(MessageAgent.get()) + 1,
+           text: params["text"],
+           timestamp: Timex.now(),
+           author: params["author"]
+         } do
       broadcast_change({:ok, message}, {:message, :created})
       {:ok, message}
     end

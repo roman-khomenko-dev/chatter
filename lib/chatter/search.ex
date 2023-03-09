@@ -1,4 +1,7 @@
 defmodule Chatter.Search do
+  @moduledoc """
+  Define search struct
+  """
   import Ecto.Changeset
 
   @types %{text: :string, likes_option: :string, likes: :integer}
