@@ -24,10 +24,12 @@ jobs:
       run: mix deps.get
       env:
         MIX_ENV: test
-    - name: Check compile warnings, formatter, credo
+    - name: Check compile warnings
       run: mix compile --warnings-as-errors
-	    run: mix format --check-formatted
-	    run: mix credo --strict
+    - name: Check formatter
+      run: mix format --check-formatted
+    - name: Run credo
+      run: mix credo --strict
     - name: Run tests
       run: mix coveralls.github
       env:
