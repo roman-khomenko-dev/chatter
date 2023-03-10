@@ -11,7 +11,6 @@ defmodule Chatter.RepoCase do
       import Ecto
       import Ecto.Query
       import Chatter.RepoCase
-
     end
   end
 

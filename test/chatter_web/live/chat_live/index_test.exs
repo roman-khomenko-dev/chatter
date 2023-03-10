@@ -4,7 +4,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
   use Chatter.RepoCase
   import Phoenix.{LiveViewTest, Component}
   alias ChatterWeb.ChatLive.Index
-  alias Chatter.{Messages, MessageFilter, Messages.Message, , Search}
+  alias Chatter.{MessageFilter, Messages, Messages.Message, Search}
   alias Chatter.UsernameSpace.Generator
 
   defp create_socket(_) do
