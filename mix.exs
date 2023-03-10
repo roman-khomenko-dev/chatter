@@ -52,10 +52,12 @@ defmodule Chatter.MixProject do
       {:bootstrap_icons, "~> 0.4.0"},
       {:ecto_sql, "~> 3.0"},
       {:phoenix_ecto, "~> 4.0"},
+      {:postgrex, ">= 0.0.0"},
       {:timex, "~> 3.0"},
       {:excoveralls, "~> 0.15.3", only: :test},
       {:decimal, "~> 2.0"},
-      {:postgrex, "~> 0.16.5"}
+      {:ex_machina, "~> 2.7.0", only: :test},
+      {:faker, "~> 0.17", only: :test}
     ]
   end
 
@@ -72,7 +74,8 @@ defmodule Chatter.MixProject do
         "esbuild default --minify",
         "sass default --no-source-map --style=compressed",
         "phx.digest"
-      ]
+      ],
+      test: ["ecto.create --quiet", "ecto.migrate", "test"]
     ]
   end
 end

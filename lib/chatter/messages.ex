@@ -22,6 +22,12 @@ defmodule Chatter.Messages do
     |> Repo.all()
   end
 
+  def all_likes do
+    from(m in Message, select: m.likes)
+    |> Repo.all()
+    |> List.flatten()
+  end
+
   @doc """
   Gets a single message.
 

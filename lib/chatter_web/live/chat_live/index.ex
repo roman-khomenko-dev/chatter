@@ -2,7 +2,6 @@ defmodule ChatterWeb.ChatLive.Index do
   use ChatterWeb, :live_view
 
   alias Chatter.{
-    MessageAgent,
     MessageFilter,
     Messages,
     Messages.Message,
@@ -69,14 +68,13 @@ defmodule ChatterWeb.ChatLive.Index do
         %{assigns: %{filter_option: filter_option, username: username}} = socket
       ) do
     with {:ok, search} <- Search.create(params),
-         messages <- MessageAgent.get(),
-         all_likes <- MessageAgent.get_all_likes(),
+         {messages, all_likes} <- {Messages.list_messages(), Messages.all_likes()},
          search_messages <-
            MessageFilter.filter_by_params(
-             {search, filter_option},
+             {search, filter_option, :full},
              {messages, all_likes}
            ) do
-      broadcast_filtered_message(search_messages, username)
+      broadcast_refill(search_messages, username)
 
       {:noreply,
        socket
@@ -98,11 +96,11 @@ defmodule ChatterWeb.ChatLive.Index do
       |> assign_filter_option(option)
       |> activate_show("show_menu")
 
-    {messages, all_likes} = {MessageAgent.get(), MessageAgent.get_all_likes()}
+    {messages, all_likes} = {Messages.list_messages(), Messages.all_likes()}
 
     {search, socket.assigns.filter_option, :full}
     |> MessageFilter.filter_by_params({messages, all_likes})
-    |> broadcast_filtered_message(username)
+    |> broadcast_refill(username)
 
     {:noreply, socket}
   end
@@ -138,7 +136,7 @@ defmodule ChatterWeb.ChatLive.Index do
 
   defp created_response({message, socket}) do
     search = apply_changes(socket.assigns.search)
-    {messages, all_likes} = {MessageAgent.get(), MessageAgent.get_all_likes()}
+    {messages, all_likes} = {Messages.list_messages(), Messages.all_likes()}
 
     is_member =
       {search, socket.assigns.filter_option, :id}
@@ -169,19 +167,19 @@ defmodule ChatterWeb.ChatLive.Index do
     if socket.assigns.show_menu == false, do: assign(socket, show_menu: true), else: socket
   end
 
-  defp message_in_filtered?(message, filtered_messages),
-    do: Enum.member?(filtered_messages, message)
-
   defp subscribe_local_messages(socket) when socket.assigns.username != nil,
     do: Messages.subscribe_local(socket.assigns.username)
 
-  defp broadcast_filtered_message(filtered_messages, username) do
-    Enum.each(Messages.list_messages(), fn message ->
-      if message_in_filtered?(message, filtered_messages),
-        do: broadcast_updated(message, username),
-        else: broadcast_removed(message, username)
-    end)
+  defp broadcast_refill(filtered_messages, username) do
+    broadcast_remove_all(Messages.list_messages(), username)
+    broadcast_insert_all(filtered_messages, username)
   end
+
+  defp broadcast_remove_all(messages, username),
+    do: Enum.each(messages, &broadcast_removed(&1, username))
+
+  defp broadcast_insert_all(messages, username),
+    do: Enum.each(messages, &broadcast_updated(&1, username))
 
   defp broadcast_removed(message, username),
     do: Messages.broadcast_change({:ok, message}, {:message, :removed}, "#{username}-messages")

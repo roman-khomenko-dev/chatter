@@ -16,6 +16,7 @@ import Config
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
+
 if System.get_env("PHX_SERVER") do
   config :chatter, ChatterWeb.Endpoint, server: true
 end
@@ -40,7 +41,13 @@ if config_env() == :prod do
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
-  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+  maybe_ipv6 = if System.get_env("ECTO_IPV6"), do: [:inet6], else: []
+
+  config :chatter, Chatter.Repo,
+    # ssl: true,
+    url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20"),
+    socket_options: maybe_ipv6
 
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")

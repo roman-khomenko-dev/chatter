@@ -15,10 +15,9 @@ defmodule Chatter.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: Chatter.PubSub},
       # Start the Endpoint (http/https)
-      ChatterWeb.Endpoint,
+      ChatterWeb.Endpoint
       # Start a worker by calling: Chatter.Worker.start_link(arg)
       # {Chatter.Worker, arg}
-      Chatter.MessageAgent
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

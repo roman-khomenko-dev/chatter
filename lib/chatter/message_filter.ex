@@ -74,7 +74,7 @@ defmodule Chatter.MessageFilter do
 
   defp filter_with_major_likes({messages, all_likes}) do
     top_messages =
-      {messages, all_likes}
+      {messages, Enum.count(all_likes)}
       |> with_likes_percent()
       |> Enum.sort_by(&Map.fetch(&1, :likes_percent), :desc)
       |> top_liked()

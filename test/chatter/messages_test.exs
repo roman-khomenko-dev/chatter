@@ -1,29 +1,32 @@
 defmodule Chatter.MessagesTest do
-  use Chatter.DataCase
+  @moduledoc false
+
+  use ChatterWeb.ConnCase
+  use Chatter.RepoCase
 
   alias Chatter.Messages
 
   describe "messages" do
     alias Chatter.Messages.Message
 
-    import Chatter.MessagesFixtures
+    import Chatter.Factory
 
-    @invalid_attrs %{}
+    @invalid_attrs %{text: Faker.Lorem.characters(2)}
 
     test "list_messages/0 returns all messages" do
-      message = message_fixture()
+      message = insert(:message)
       assert Messages.list_messages() == [message]
     end
 
     test "get_message!/1 returns the message with given id" do
-      message = message_fixture()
+      message = insert(:message)
       assert Messages.get_message!(message.id) == message
     end
 
     test "create_message/1 with valid data creates a message" do
-      valid_attrs = %{}
+      valid_attrs = params_for(:message)
 
-      assert {:ok, %Message{} = message} = Messages.create_message(valid_attrs)
+      assert {:ok, %Message{} = _message} = Messages.create_message(valid_attrs)
     end
 
     test "create_message/1 with invalid data returns error changeset" do
@@ -31,26 +34,26 @@ defmodule Chatter.MessagesTest do
     end
 
     test "update_message/2 with valid data updates the message" do
-      message = message_fixture()
-      update_attrs = %{}
+      message = insert(:message)
+      update_attrs = %{text: Faker.Lorem.sentence(4)}
 
-      assert {:ok, %Message{} = message} = Messages.update_message(message, update_attrs)
+      assert {:ok, %Message{} = _message} = Messages.update_message(message, update_attrs)
     end
 
     test "update_message/2 with invalid data returns error changeset" do
-      message = message_fixture()
+      message = insert(:message)
       assert {:error, %Ecto.Changeset{}} = Messages.update_message(message, @invalid_attrs)
       assert message == Messages.get_message!(message.id)
     end
 
     test "delete_message/1 deletes the message" do
-      message = message_fixture()
+      message = insert(:message)
       assert {:ok, %Message{}} = Messages.delete_message(message)
       assert_raise Ecto.NoResultsError, fn -> Messages.get_message!(message.id) end
     end
 
     test "change_message/1 returns a message changeset" do
-      message = message_fixture()
+      message = insert(:message)
       assert %Ecto.Changeset{} = Messages.change_message(message)
     end
   end
