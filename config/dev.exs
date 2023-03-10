@@ -19,6 +19,16 @@ config :chatter, ChatterWeb.Endpoint,
     esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
   ]
 
+# Configure database
+config :chatter, Chatter.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "chatter_dev",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed

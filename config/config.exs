@@ -7,6 +7,8 @@
 # General application configuration
 import Config
 
+config :chatter, ecto_repos: [Chatter.Repo]
+
 # Configures the endpoint
 config :chatter, ChatterWeb.Endpoint,
   url: [host: "localhost"],

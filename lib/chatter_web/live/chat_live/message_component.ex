@@ -17,7 +17,7 @@ defmodule MessageComponent do
             <div class="card-footer">
                 <small class="text-muted row">
                 <span class="col col-sm">
-                        Written at <%= elem(Timex.format(message.timestamp, "%Y-%m-%d %H:%M:%S", :strftime),1) %> by
+                        Written at <%= elem(Timex.format(message.inserted_at, "%Y-%m-%d %H:%M:%S", :strftime),1) %> by
                         <%= "<#{message.author}>" %>
                     </span>
                     <span class="col col-1">

@@ -3,12 +3,21 @@ defmodule Chatter.MessageFilter do
   Describe messages filtering functionality
   """
 
-  alias Chatter.{MessageAgent, Search}
+  alias Chatter.{Messages, Search}
 
-  def filter_by_params({search, nil = _filter_option}, _messages_data),
+  def filter_by_params({search, nil = _filter_option, :id = _mode}, _messages_data),
+    do: Enum.map(get_search_messages(search), fn message -> message.id end)
+
+  def filter_by_params({search, nil = _filter_option, :full = _mode}, _messages_data),
     do: get_search_messages(search)
 
-  def filter_by_params({search, filter_option}, {messages, all_likes}) do
+  def filter_by_params({search, filter_option, :id = __mode}, {messages, all_likes}) do
+    {search, filter_option, :full}
+    |> filter_by_params({messages, all_likes})
+    |> Enum.map(fn message -> message.id end)
+  end
+
+  def filter_by_params({search, filter_option, :full = __mode}, {messages, all_likes}) do
     search_messages = get_search_messages(search)
 
     {filter_option, {messages, all_likes}}
@@ -29,7 +38,9 @@ defmodule Chatter.MessageFilter do
     end
   end
 
-  def get_search_messages(search), do: Enum.filter(MessageAgent.get(), &filter(&1, search))
+  def get_search_messages(search), do: Enum.filter(Messages.list_messages(), &filter(&1, search))
+
+  def filter(message, %Chatter.Search{text: nil, likes: nil} = _search), do: message
 
   def filter(message, search) do
     filter_text(message, search) && filter_likes(message, search)
