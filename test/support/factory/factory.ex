@@ -11,8 +11,8 @@ defmodule Chatter.Factory do
       text: Faker.Lorem.sentence(5),
       author: Generator.run() |> elem(1),
       likes: [],
-      inserted_at: DateTime.now("Etc/UTC") |> elem(1),
-      updated_at: DateTime.now("Etc/UTC") |> elem(1)
+      inserted_at: DateTime.now!("Etc/UTC"),
+      updated_at: DateTime.now!("Etc/UTC")
     }
 
     # merge attributes and evaluate lazy attributes at the end to emulate

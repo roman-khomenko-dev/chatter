@@ -47,7 +47,9 @@ defmodule ChatterWeb.ChatLive.IndexTest do
         "user" => socket.assigns.username
       })
 
-      assert List.first(Messages.list_messages()).likes == [socket.assigns.username]
+      assert Messages.list_messages() |> List.first() |> Map.get(:likes) == [
+               socket.assigns.username
+             ]
 
       render_click(view, :like, %{
         "id" => Integer.to_string(message.id),
@@ -66,10 +68,8 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       search = Search.change_search(%Search{text: "Greet", likes_option: "=", likes: 0})
       socket = assign(socket, search: search)
 
-      {messages, all_likes} = {Messages.list_messages(), Messages.all_likes()}
-
       assert {Index.apply_search(socket), socket.assigns.filter_option, :full}
-             |> shown_filter_messages({messages, all_likes}) == 1
+             |> shown_filter_messages() == 1
     end
 
     test "using the advanced message filter happens correctly", %{socket: socket, conn: conn} do
@@ -101,17 +101,15 @@ defmodule ChatterWeb.ChatLive.IndexTest do
         "user" => Enum.at(message_authors, 0).author
       })
 
-      {messages, all_likes} = {Messages.list_messages(), Messages.all_likes()}
-
       socket = Index.assign_filter_option(socket, :with_likes_who_liked)
 
       assert {Index.apply_search(socket), :with_likes_who_liked, :full}
-             |> shown_filter_messages({messages, all_likes}) == 2
+             |> shown_filter_messages() == 2
 
       socket = Index.assign_filter_option(socket, :without_likes_who_never_liked)
 
       assert {Index.apply_search(socket), :without_likes_who_never_liked, :full}
-             |> shown_filter_messages({messages, all_likes}) == 3
+             |> shown_filter_messages() == 3
 
       Enum.each(2..4, fn message_index ->
         render_click(view, :like, %{
@@ -123,13 +121,13 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       socket = Index.assign_filter_option(socket, :with_major_likes)
 
       assert {Index.apply_search(socket), :with_major_likes, :full}
-             |> shown_filter_messages({messages, all_likes}) == 1
+             |> shown_filter_messages() == 1
     end
   end
 
-  defp shown_filter_messages(params, messages) do
+  defp shown_filter_messages(params) do
     params
-    |> MessageFilter.filter_by_params(messages)
+    |> MessageFilter.filter_by_params()
     |> Enum.count()
   end
 end

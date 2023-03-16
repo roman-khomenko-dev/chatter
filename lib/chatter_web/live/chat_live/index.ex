@@ -68,12 +68,7 @@ defmodule ChatterWeb.ChatLive.Index do
         %{assigns: %{filter_option: filter_option, username: username}} = socket
       ) do
     with {:ok, search} <- Search.create(params),
-         {messages, all_likes} <- {Messages.list_messages(), Messages.all_likes()},
-         search_messages <-
-           MessageFilter.filter_by_params(
-             {search, filter_option, :full},
-             {messages, all_likes}
-           ) do
+         search_messages <- MessageFilter.filter_by_params({search, filter_option, :full}) do
       broadcast_refill(search_messages, username)
 
       {:noreply,
@@ -96,10 +91,8 @@ defmodule ChatterWeb.ChatLive.Index do
       |> assign_filter_option(option)
       |> activate_show("show_menu")
 
-    {messages, all_likes} = {Messages.list_messages(), Messages.all_likes()}
-
     {search, socket.assigns.filter_option, :full}
-    |> MessageFilter.filter_by_params({messages, all_likes})
+    |> MessageFilter.filter_by_params()
     |> broadcast_refill(username)
 
     {:noreply, socket}
@@ -136,11 +129,10 @@ defmodule ChatterWeb.ChatLive.Index do
 
   defp created_response({message, socket}) do
     search = apply_changes(socket.assigns.search)
-    {messages, all_likes} = {Messages.list_messages(), Messages.all_likes()}
 
     is_member =
       {search, socket.assigns.filter_option, :id}
-      |> MessageFilter.filter_by_params({messages, all_likes})
+      |> MessageFilter.filter_by_params()
       |> Enum.member?(message.id)
 
     {is_member, message, socket} |> created_member_response()

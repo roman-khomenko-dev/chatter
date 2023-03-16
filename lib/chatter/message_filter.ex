@@ -3,121 +3,151 @@ defmodule Chatter.MessageFilter do
   Describe messages filtering functionality
   """
 
-  alias Chatter.{Messages, Search}
+  import Ecto.Query, warn: false
+  alias Chatter.{Messages.Message, Repo, Search}
 
-  def filter_by_params({search, nil = _filter_option, :id = _mode}, _messages_data),
+  def filter_by_params({search, nil = _filter_option, :id = _mode}),
     do: Enum.map(get_search_messages(search), fn message -> message.id end)
 
-  def filter_by_params({search, nil = _filter_option, :full = _mode}, _messages_data),
+  def filter_by_params({search, nil = _filter_option, :full = _mode}),
     do: get_search_messages(search)
 
-  def filter_by_params({search, filter_option, :id = __mode}, {messages, all_likes}) do
+  def filter_by_params({search, filter_option, :id = _mode}) do
     {search, filter_option, :full}
-    |> filter_by_params({messages, all_likes})
+    |> filter_by_params()
     |> Enum.map(fn message -> message.id end)
   end
 
-  def filter_by_params({search, filter_option, :full = __mode}, {messages, all_likes}) do
+  def filter_by_params({search, filter_option, :full = _mode}) do
     search_messages = get_search_messages(search)
 
-    {filter_option, {messages, all_likes}}
+    filter_option
     |> filter_by_option()
     |> Enum.filter(fn message -> message in search_messages end)
   end
 
-  def filter_by_option({filter_option, {messages, all_likes}}) do
+  def filter_by_option(filter_option) do
     case filter_option do
       :with_likes_who_liked ->
-        filter_with_likes_who_like({messages, all_likes})
+        filter_with_likes_who_like()
 
       :without_likes_who_never_liked ->
-        filter_without_likes_who_never_liked({messages, all_likes})
+        filter_without_likes_who_never_liked()
 
       :with_major_likes ->
-        filter_with_major_likes({messages, all_likes})
+        filter_with_major_likes()
     end
   end
 
-  def get_search_messages(search), do: Enum.filter(Messages.list_messages(), &filter(&1, search))
+  def get_search_messages(search) do
+    {query, search} =
+      {from(m in Message, as: :message, order_by: [desc: m.id]), convert_blank_text(search)}
 
-  def filter(message, %Chatter.Search{text: nil, likes: nil} = _search), do: message
-
-  def filter(message, search) do
-    filter_text(message, search) && filter_likes(message, search)
+    {query, search}
+    |> filter()
+    |> Repo.all()
   end
 
-  defp filter_text(message, %Search{text: nil} = _search), do: message
+  def filter({query, %Search{text: nil, likes: nil} = _search}), do: query
 
-  defp filter_text(message, %Search{text: search_text} = _search), do: message.text =~ search_text
-
-  defp filter_likes(message, %{likes: nil} = _search), do: message
-
-  defp filter_likes(message, %{likes_option: option, likes: likes_count} = _search) do
-    case option do
-      ">=" -> Enum.count(message.likes) >= likes_count
-      "<=" -> Enum.count(message.likes) <= likes_count
-      "=" -> Enum.count(message.likes) == likes_count
-    end
+  def filter({query, %Search{text: text, likes: nil} = _search}) do
+    ilike_text = "%#{text}%"
+    query |> where([m], ilike(m.text, ^ilike_text))
   end
 
-  defp filter_with_likes_who_like({messages, all_likes}) do
-    Enum.filter(messages, fn message ->
-      if !Enum.empty?(message.likes) && message.author in all_likes, do: message
-    end)
+  def filter({query, %Search{text: nil, likes_option: option, likes: likes_count} = _search}) do
+    likes_condition = likes_condition(option, likes_count)
+    query |> where([m], ^likes_condition)
   end
 
-  defp filter_without_likes_who_never_liked({messages, all_likes}) do
-    Enum.filter(messages, fn message ->
-      if Enum.empty?(message.likes) && message.author not in all_likes, do: message
-    end)
+  def filter({query, %Search{text: text, likes_option: option, likes: likes_count} = _search}) do
+    {likes_condition, ilike_text} = {likes_condition(option, likes_count), "%#{text}%"}
+
+    query
+    |> where([m], ilike(m.text, ^ilike_text))
+    |> where([m], ^likes_condition)
   end
 
-  defp filter_with_major_likes({messages, all_likes}) do
-    top_messages =
-      {messages, Enum.count(all_likes)}
-      |> with_likes_percent()
-      |> Enum.sort_by(&Map.fetch(&1, :likes_percent), :desc)
-      |> top_liked()
-
-    Enum.filter(messages, fn message -> message.id in top_messages.ids end)
+  defp filter_with_likes_who_like do
+    from(m in Message, where: m.author in subquery(list_likes({true, false})))
+    |> order_by([m], desc: m.id)
+    |> Repo.all()
   end
 
-  defp top_liked(messages) do
-    messages
-    |> Enum.reduce_while(%{ids: [], percent: 0}, fn message_info, acc ->
+  defp filter_without_likes_who_never_liked do
+    from(m in Message, where: m.author not in subquery(list_likes({true, true})) and m.likes == [])
+    |> order_by([m], desc: m.id)
+    |> Repo.all()
+  end
+
+  defp filter_with_major_likes do
+    get_total_likes()
+    |> with_likes_percent()
+    |> top_liked()
+    |> sort_by_last_inserted()
+  end
+
+  defp sort_by_last_inserted(messages),
+    do: messages |> Enum.sort_by(fn message -> message.inserted_at end, :desc)
+
+  defp get_total_likes do
+    {false, true}
+    |> list_likes()
+    |> Repo.all()
+    |> Enum.count()
+  end
+
+  defp top_liked(with_likes_percent) do
+    top_liked = %{messages: [], percentage: 0}
+
+    Enum.reduce_while(with_likes_percent, top_liked, fn data, acc ->
       acc = %{
         acc
-        | ids: acc.ids ++ [message_info.id],
-          percent: acc.percent + message_info.likes_percent
+        | messages: [data.message | acc.messages],
+          percentage: acc.percentage + data.likes_percent
       }
 
-      if acc.percent < 80.0, do: {:cont, acc}, else: {:halt, acc}
+      if acc.percentage < 80, do: {:cont, acc}, else: {:halt, acc}
     end)
+    |> Map.get(:messages)
   end
 
-  defp with_likes_percent({messages, likes_summary}) do
-    messages
-    |> Enum.reduce([], fn message, acc ->
-      [
-        %{
-          id: message.id,
-          likes_percent:
-            message.likes
-            |> Enum.count()
-            |> calculate_likes_percent(likes_summary)
-        }
-        | acc
-      ]
-    end)
-    |> Enum.reverse()
+  defp with_likes_percent(total_likes) do
+    from(m in Message,
+      select: %{
+        message: m,
+        likes_percent:
+          (type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100)
+          |> selected_as(:likes_percent)
+      },
+      order_by: [desc: selected_as(:likes_percent)]
+    )
+    |> Repo.all()
   end
 
-  defp calculate_likes_percent(_message_likes, 0 = _likes_summary), do: 0
-
-  defp calculate_likes_percent(message_likes, likes_summary) do
-    message_likes
-    |> Decimal.div(likes_summary)
-    |> Decimal.to_float()
-    |> Kernel.*(100)
+  defp likes_condition(option, likes_count) do
+    case option do
+      ">=" -> dynamic([m], fragment("cardinality(?)", m.likes) >= ^likes_count)
+      "<=" -> dynamic([m], fragment("cardinality(?)", m.likes) <= ^likes_count)
+      "=" -> dynamic([m], fragment("cardinality(?)", m.likes) == ^likes_count)
+    end
   end
+
+  defp list_likes({uniqueness, empty}) do
+    where = empty_likes_condition(empty)
+
+    from(m1 in Message,
+      distinct: ^uniqueness,
+      select: %{likes: fragment("unnest(?)", m1.likes)},
+      where: ^where
+    )
+  end
+
+  defp empty_likes_condition(empty),
+    do: if(empty == false, do: dynamic([m1], m1.likes != []), else: true)
+
+  defp convert_blank_text(%{text: nil} = search), do: search
+
+  defp convert_blank_text(search),
+    do: if(byte_size(search.text) == 0, do: %{search | text: nil}, else: search)
 end
