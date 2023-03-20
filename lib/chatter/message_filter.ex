@@ -84,11 +84,7 @@ defmodule Chatter.MessageFilter do
     get_total_likes()
     |> with_likes_percent()
     |> top_liked()
-    |> sort_by_last_inserted()
   end
-
-  defp sort_by_last_inserted(messages),
-    do: messages |> Enum.sort_by(fn message -> message.inserted_at end, :desc)
 
   defp get_total_likes do
     {false, true}
@@ -98,31 +94,55 @@ defmodule Chatter.MessageFilter do
   end
 
   defp top_liked(with_likes_percent) do
-    top_liked = %{messages: [], percentage: 0}
+    from(m in subquery(with_likes_percent),
+      select: %Message{
+        id: m.id,
+        text: m.text,
+        author: m.author,
+        likes: m.likes,
+        inserted_at: m.inserted_at,
+        updated_at: m.updated_at
+      },
+      where: m.row_index <= subquery(min_row_index(with_likes_percent)),
+      order_by: [desc: m.inserted_at]
+    )
+    |> Repo.all()
+  end
 
-    Enum.reduce_while(with_likes_percent, top_liked, fn data, acc ->
-      acc = %{
-        acc
-        | messages: [data.message | acc.messages],
-          percentage: acc.percentage + data.likes_percent
-      }
-
-      if acc.percentage < 80, do: {:cont, acc}, else: {:halt, acc}
-    end)
-    |> Map.get(:messages)
+  defp min_row_index(with_likes_percent) do
+    from(m in subquery(with_likes_percent),
+      select: min(m.row_index),
+      where: m.cumulative_likes_percent >= 80
+    )
   end
 
   defp with_likes_percent(total_likes) do
     from(m in Message,
       select: %{
-        message: m,
-        likes_percent:
-          (type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100)
-          |> selected_as(:likes_percent)
-      },
-      order_by: [desc: selected_as(:likes_percent)]
+        id: m.id,
+        text: m.text,
+        author: m.author,
+        likes: m.likes,
+        inserted_at: m.inserted_at,
+        updated_at: m.updated_at,
+        cumulative_likes_percent:
+          sum(type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100)
+          |> over(
+            order_by: [
+              desc: type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100
+            ]
+          )
+          |> selected_as(:cumulative_likes_percent),
+        row_index:
+          row_number()
+          |> over(
+            order_by: [
+              desc: type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100
+            ]
+          )
+          |> selected_as(:row_index)
+      }
     )
-    |> Repo.all()
   end
 
   defp likes_condition(option, likes_count) do
