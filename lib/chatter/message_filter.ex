@@ -94,26 +94,21 @@ defmodule Chatter.MessageFilter do
   end
 
   defp top_liked(with_likes_percent) do
-    from(m in subquery(with_likes_percent),
-      select: %Message{
-        id: m.id,
-        text: m.text,
-        author: m.author,
-        likes: m.likes,
-        inserted_at: m.inserted_at,
-        updated_at: m.updated_at
-      },
-      where: m.row_index <= subquery(min_row_index(with_likes_percent)),
-      order_by: [desc: m.inserted_at]
+    Message
+    |> with_cte("with_likes_percent", as: ^with_likes_percent)
+    |> join(:left, [m], ml in "with_likes_percent", on: m.id == ml.id)
+    |> where(
+      [m, ml],
+      ml.row_index <=
+        subquery(
+          from(rows in "with_likes_percent",
+            select: min(rows.row_index),
+            where: rows.cumulative_likes_percent >= 80
+          )
+        )
     )
+    |> order_by([m], desc: m.id)
     |> Repo.all()
-  end
-
-  defp min_row_index(with_likes_percent) do
-    from(m in subquery(with_likes_percent),
-      select: min(m.row_index),
-      where: m.cumulative_likes_percent >= 80
-    )
   end
 
   defp with_likes_percent(total_likes) do
