@@ -84,6 +84,7 @@ defmodule Chatter.MessageFilter do
     get_total_likes()
     |> with_likes_percent()
     |> top_liked()
+    |> Repo.all()
   end
 
   defp get_total_likes do
@@ -108,7 +109,6 @@ defmodule Chatter.MessageFilter do
         )
     )
     |> order_by([m], desc: m.id)
-    |> Repo.all()
   end
 
   defp with_likes_percent(total_likes) do
