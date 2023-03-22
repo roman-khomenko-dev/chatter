@@ -122,21 +122,18 @@ defmodule Chatter.MessageFilter do
         updated_at: m.updated_at,
         cumulative_likes_percent:
           sum(type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100)
-          |> over(
-            order_by: [
-              desc: type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100
-            ]
-          )
+          |> over(:ordered_likes_percent)
           |> selected_as(:cumulative_likes_percent),
         row_index:
           row_number()
-          |> over(
-            order_by: [
-              desc: type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100
-            ]
-          )
+          |> over(:ordered_likes_percent)
           |> selected_as(:row_index)
-      }
+      },
+      windows: [
+        ordered_likes_percent: [
+          order_by: [desc: type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100]
+        ]
+      ]
     )
   end
 
