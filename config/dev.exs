@@ -21,13 +21,10 @@ config :chatter, ChatterWeb.Endpoint,
 
 # Configure database
 config :chatter, Chatter.Repo,
-  username: "postgres",
-  password: "postgres",
+  username: "root",
+  password: "password",
   hostname: "localhost",
-  database: "chatter_dev",
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  database: "chatter_dev"
 
 # ## SSL Support
 #
