@@ -21,7 +21,7 @@ defmodule Chatter.MixProject do
   def application do
     [
       mod: {Chatter.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :mongodb_ecto, :ecto, :runtime_tools]
     ]
   end
 
@@ -52,7 +52,7 @@ defmodule Chatter.MixProject do
       {:bootstrap_icons, "~> 0.4.0"},
       {:ecto_sql, "~> 3.0"},
       {:phoenix_ecto, "~> 4.0"},
-      {:mongodb_ecto, ">= 0.2.1"},
+      {:mongodb_ecto, "~> 1.0.0"},
       {:timex, "~> 3.0"},
       {:excoveralls, "~> 0.15.3", only: :test},
       {:decimal, "~> 2.0"},

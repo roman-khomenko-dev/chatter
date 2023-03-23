@@ -5,6 +5,7 @@ defmodule Chatter.Messages.Message do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @primary_key {:id, :binary_id, autogenerate: true}
   schema "messages" do
     field(:author, :string)
     field(:likes, {:array, :string})
