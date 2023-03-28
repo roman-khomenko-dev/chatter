@@ -1,12 +1,19 @@
 defmodule ChatterWeb.ChatLive.Index do
   use ChatterWeb, :live_view
 
-  alias Chatter.{Message, MessageAgent, MessageFilter, Search, UsernameSpace.Generator}
+  alias Chatter.{
+    MessageFilter,
+    Messages,
+    Messages.Message,
+    Search,
+    UsernameSpace.Generator
+  }
+
   import Ecto.Changeset
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Message.subscribe_global()
+    if connected?(socket), do: Messages.subscribe_global()
 
     socket =
       socket
@@ -18,17 +25,18 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   @impl true
-  def handle_info({Message, {:message, :created}, message}, socket) do
+  def handle_info({Messages, {:message, :created}, message}, socket) do
+    message = Map.put(message, :likes, [])
     {:noreply, {message, socket} |> created_response()}
   end
 
   @impl true
-  def handle_info({Message, {:message, :updated}, message}, socket) do
+  def handle_info({Messages, {:message, :updated}, message}, socket) do
     {:noreply, stream_insert(socket, :messages, message, at: -1)}
   end
 
   @impl true
-  def handle_info({Message, {:message, :removed}, message}, socket) do
+  def handle_info({Messages, {:message, :removed}, message}, socket) do
     {:noreply, stream_delete(socket, :messages, message)}
   end
 
@@ -47,27 +55,21 @@ defmodule ChatterWeb.ChatLive.Index do
 
   @impl true
   def handle_event("save", %{"message" => params}, socket) do
-    case Message.create(params) do
-      {:ok, message} ->
-        MessageAgent.add(message)
-        {:noreply, assign(socket, changeset: Message.change_message(%Message{}))}
-
-      _error ->
-        {:noreply, socket |> put_flash(:error, "Creation failed")}
+    with {:ok, message} <- Messages.create_message(params) do
+      Messages.broadcast_change({:ok, message}, {:message, :created})
+      {:noreply, assign(socket, changeset: Message.change_message(%Message{}))}
     end
   end
 
   @impl true
-  def handle_event("search", %{"search" => params}, socket) do
+  def handle_event(
+        "search",
+        %{"search" => params},
+        %{assigns: %{filter_option: filter_option, username: username}} = socket
+      ) do
     with {:ok, search} <- Search.create(params),
-         messages <- MessageAgent.get(),
-         all_likes <- MessageAgent.get_all_likes(),
-         search_messages <-
-           MessageFilter.filter_by_params(
-             {search, socket.assigns.filter_option},
-             {messages, all_likes}
-           ) do
-      broadcast_filtered_message(search_messages, socket.assigns.username)
+         search_messages <- MessageFilter.filter_by_params({search, filter_option, :full}) do
+      broadcast_refill(search_messages, username)
 
       {:noreply,
        socket
@@ -89,11 +91,9 @@ defmodule ChatterWeb.ChatLive.Index do
       |> assign_filter_option(option)
       |> activate_show("show_menu")
 
-    {messages, all_likes} = {MessageAgent.get(), MessageAgent.get_all_likes()}
-
-    {search, socket.assigns.filter_option}
-    |> MessageFilter.filter_by_params({messages, all_likes})
-    |> broadcast_filtered_message(username)
+    {search, socket.assigns.filter_option, :full}
+    |> MessageFilter.filter_by_params()
+    |> broadcast_refill(username)
 
     {:noreply, socket}
   end
@@ -105,7 +105,10 @@ defmodule ChatterWeb.ChatLive.Index do
 
   @impl true
   def handle_event("like", %{"id" => id, "user" => user} = _params, socket) do
-    MessageAgent.set_like(MessageAgent, {String.to_integer(id), user})
+    message = Messages.get_message!(id)
+    {:ok, message} = message |> Messages.update_message(%{likes: proceed_like(message, user)})
+
+    broadcast_updated(message, socket.assigns.username)
 
     {:noreply, socket}
   end
@@ -121,17 +124,16 @@ defmodule ChatterWeb.ChatLive.Index do
   end
 
   def assign_messages(socket) do
-    stream(socket, :messages, MessageAgent.get())
+    stream(socket, :messages, Messages.list_messages())
   end
 
   defp created_response({message, socket}) do
     search = apply_changes(socket.assigns.search)
-    {messages, all_likes} = {MessageAgent.get(), MessageAgent.get_all_likes()}
 
     is_member =
-      {search, socket.assigns.filter_option}
-      |> MessageFilter.filter_by_params({messages, all_likes})
-      |> Enum.member?(message)
+      {search, socket.assigns.filter_option, :id}
+      |> MessageFilter.filter_by_params()
+      |> Enum.member?(message.id)
 
     {is_member, message, socket} |> created_member_response()
   end
@@ -157,23 +159,38 @@ defmodule ChatterWeb.ChatLive.Index do
     if socket.assigns.show_menu == false, do: assign(socket, show_menu: true), else: socket
   end
 
-  defp message_in_filtered?(message, filtered_messages),
-    do: Enum.member?(filtered_messages, message)
-
   defp subscribe_local_messages(socket) when socket.assigns.username != nil,
-    do: Message.subscribe_local(socket.assigns.username)
+    do: Messages.subscribe_local(socket.assigns.username)
 
-  defp broadcast_filtered_message(filtered_messages, username) do
-    Enum.each(MessageAgent.get(), fn message ->
-      if message_in_filtered?(message, filtered_messages),
-        do: broadcast_updated(message, username),
-        else: broadcast_removed(message, username)
-    end)
+  defp broadcast_refill(filtered_messages, username) do
+    broadcast_remove_all(Messages.list_messages(), username)
+    broadcast_insert_all(filtered_messages, username)
   end
 
+  defp broadcast_remove_all(messages, username),
+    do: Enum.each(messages, &broadcast_removed(&1, username))
+
+  defp broadcast_insert_all(messages, username),
+    do: Enum.each(messages, &broadcast_updated(&1, username))
+
   defp broadcast_removed(message, username),
-    do: Message.broadcast_change({:ok, message}, {:message, :removed}, "#{username}-messages")
+    do: Messages.broadcast_change({:ok, message}, {:message, :removed}, "#{username}-messages")
 
   defp broadcast_updated(message, username),
-    do: Message.broadcast_change({:ok, message}, {:message, :updated}, "#{username}-messages")
+    do: Messages.broadcast_change({:ok, message}, {:message, :updated}, "#{username}-messages")
+
+  defp proceed_like(message, user),
+    do:
+      if(Enum.member?(Map.get(message, :likes), user),
+        do: remove_like(message, user),
+        else: push_like(message, user)
+      )
+
+  defp push_like(message, user) do
+    [user | Map.get(message, :likes)]
+  end
+
+  defp remove_like(message, user) do
+    List.delete(Map.get(message, :likes), user)
+  end
 end
