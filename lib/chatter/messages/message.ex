@@ -8,7 +8,7 @@ defmodule Chatter.Messages.Message do
   @primary_key {:id, :binary_id, autogenerate: true}
   schema "messages" do
     field(:author, :string)
-    field(:likes, {:array, :string})
+    field(:likes, {:array, :string}, default: [])
     field(:text, :string)
 
     timestamps()

@@ -4,6 +4,7 @@ defmodule Chatter.MessageFilter do
   """
 
   import Ecto.Query, warn: false
+  alias Mongo.Ecto.Helpers
   alias Chatter.{Messages.Message, Repo, Search}
 
   def filter_by_params({search, nil = _filter_option, :id = _mode}),
@@ -51,25 +52,28 @@ defmodule Chatter.MessageFilter do
   def filter({query, %Search{text: nil, likes: nil} = _search}), do: query
 
   def filter({query, %Search{text: text, likes: nil} = _search}) do
-    ilike_text = "%#{text}%"
-    query |> where([m], ilike(m.text, ^ilike_text))
+    text_regex = Helpers.regex("#{text}")
+
+    query
+    |> where(fragment(text: ["$regex": ^text_regex, "$options": "i"]))
   end
 
   def filter({query, %Search{text: nil, likes_option: option, likes: likes_count} = _search}) do
-    likes_condition = likes_condition(option, likes_count)
-    query |> where([m], ^likes_condition)
+    query |> filter_likes_condition(option, likes_count) |> dbg()
   end
 
   def filter({query, %Search{text: text, likes_option: option, likes: likes_count} = _search}) do
-    {likes_condition, ilike_text} = {likes_condition(option, likes_count), "%#{text}%"}
+    text_regex = Helpers.regex("#{text}")
 
     query
-    |> where([m], ilike(m.text, ^ilike_text))
-    |> where([m], ^likes_condition)
+    |> where(fragment(text: ["$regex": ^text_regex, "$options": "i"]))
+    |> filter_likes_condition(option, likes_count)
   end
 
   defp filter_with_likes_who_like do
-    from(m in Message, where: m.author in subquery(list_likes({true, false})))
+    list_likes = list_likes({true, false})
+
+    from(m in Message, where: m.author in list_likes)
     |> order_by([m], desc: m.id)
     |> Repo.all()
   end
@@ -140,26 +144,31 @@ defmodule Chatter.MessageFilter do
     )
   end
 
-  defp likes_condition(option, likes_count) do
-    case option do
-      ">=" -> dynamic([m], fragment("cardinality(?)", m.likes) >= ^likes_count)
-      "<=" -> dynamic([m], fragment("cardinality(?)", m.likes) <= ^likes_count)
-      "=" -> dynamic([m], fragment("cardinality(?)", m.likes) == ^likes_count)
-    end
+  defp filter_likes_condition(query, ">=", likes_count) do
+    size = %{"$size": "$likes"}
+    where(query, fragment("$expr": ["$gte": [^size, ^likes_count]]))
+  end
+
+  defp filter_likes_condition(query, "<=", likes_count) do
+    size = %{"$size": "$likes"}
+    where(query, fragment("$expr": ["$lte": [^size, ^likes_count]]))
+  end
+
+  defp filter_likes_condition(query, "=", likes_count) do
+    size = %{"$size": "$likes"}
+    where(query, fragment("$expr": ["$eq": [^size, ^likes_count]]))
   end
 
   defp list_likes({uniqueness, empty}) do
-    where = empty_likes_condition(empty)
+    query =
+      from m in Message,
+      unwind: "likes",
+      group_by: fragment("false"),
+      select: %{likes: fragment("{$addToSet: '$likes'}")},
+      select_merge: %{_id: 0, likes: ^"likes"}
 
-    from(m1 in Message,
-      distinct: ^uniqueness,
-      select: %{likes: fragment("unnest(?)", m1.likes)},
-      where: ^where
-    )
+    Repo.aggregate(query)
   end
-
-  defp empty_likes_condition(empty),
-    do: if(empty == false, do: dynamic([m1], m1.likes != []), else: true)
 
   defp convert_blank_text(%{text: nil} = search), do: search
 
