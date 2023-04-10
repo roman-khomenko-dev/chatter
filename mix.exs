@@ -50,7 +50,7 @@ defmodule Chatter.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:dart_sass, "~> 0.5", runtime: Mix.env() == :dev},
       {:bootstrap_icons, "~> 0.4.0"},
-      {:ecto_sql, "~> 3.0"},
+      {:ecto, "~> 3.9.5"},
       {:phoenix_ecto, "~> 4.0"},
       {:mongodb_ecto, "~> 1.0.0"},
       {:timex, "~> 3.0"},
@@ -75,7 +75,7 @@ defmodule Chatter.MixProject do
         "sass default --no-source-map --style=compressed",
         "phx.digest"
       ],
-      test: ["ecto.create --quiet", "ecto.migrate", "test"]
+      test: ["ecto.create --quiet", "test"]
     ]
   end
 end

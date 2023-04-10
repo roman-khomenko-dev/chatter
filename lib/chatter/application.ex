@@ -12,6 +12,8 @@ defmodule Chatter.Application do
       ChatterWeb.Telemetry,
       # Start the Ecto repository
       Chatter.Repo,
+      # Start MongoDB provider
+      {Mongo, [name: :mongo, database: Application.get_env(:chatter, :db)[:name], pool_size: 5]},
       # Start the PubSub system
       {Phoenix.PubSub, name: Chatter.PubSub},
       # Start the Endpoint (http/https)
