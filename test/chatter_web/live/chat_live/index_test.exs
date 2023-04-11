@@ -29,6 +29,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       socket: socket,
       conn: conn
     } do
+      Mongo.Ecto.truncate(Chatter.Repo)
       socket = Index.assign_default(socket)
       {:ok, view, _html} = live(conn, "/")
 
@@ -43,7 +44,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       assert message.text == "Greetings"
 
       render_click(view, :like, %{
-        "id" => Integer.to_string(message.id),
+        "id" => message.id,
         "user" => socket.assigns.username
       })
 
@@ -52,7 +53,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
              ]
 
       render_click(view, :like, %{
-        "id" => Integer.to_string(message.id),
+        "id" => message.id,
         "user" => socket.assigns.username
       })
 
@@ -73,6 +74,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
     end
 
     test "using the advanced message filter happens correctly", %{socket: socket, conn: conn} do
+      Mongo.Ecto.truncate(Chatter.Repo)
       socket = Index.assign_default(socket)
       {:ok, view, _html} = live(conn, "/")
 
@@ -92,12 +94,12 @@ defmodule ChatterWeb.ChatLive.IndexTest do
       socket = assign(socket, messages: Messages.list_messages())
 
       render_click(view, :like, %{
-        "id" => Integer.to_string(Enum.at(message_authors, 0).id),
+        "id" => Enum.at(message_authors, 0).id,
         "user" => Enum.at(message_authors, 1).author
       })
 
       render_click(view, :like, %{
-        "id" => Integer.to_string(Enum.at(message_authors, 1).id),
+        "id" => Enum.at(message_authors, 1).id,
         "user" => Enum.at(message_authors, 0).author
       })
 
@@ -113,7 +115,7 @@ defmodule ChatterWeb.ChatLive.IndexTest do
 
       Enum.each(2..4, fn message_index ->
         render_click(view, :like, %{
-          "id" => Integer.to_string(Enum.at(message_authors, 1).id),
+          "id" => Enum.at(message_authors, 1).id,
           "user" => Enum.at(message_authors, message_index).author
         })
       end)

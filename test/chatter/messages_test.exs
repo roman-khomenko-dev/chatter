@@ -14,6 +14,7 @@ defmodule Chatter.MessagesTest do
     @invalid_attrs %{text: Faker.Lorem.characters(2)}
 
     test "list_messages/0 returns all messages" do
+      Mongo.Ecto.truncate(Chatter.Repo)
       message = insert(:message)
       assert Messages.list_messages() == [message]
     end
