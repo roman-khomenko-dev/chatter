@@ -21,13 +21,9 @@ config :chatter, ChatterWeb.Endpoint,
 
 # Configure database
 config :chatter, Chatter.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
+  adapter: Mongo.Ecto,
   database: "chatter_dev",
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  hostname: "localhost"
 
 # ## SSL Support
 #

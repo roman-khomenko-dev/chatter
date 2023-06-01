@@ -7,7 +7,7 @@ defmodule Chatter.Factory do
 
   def message_factory(attrs) do
     message = %Message{
-      id: sequence(:id, fn number -> number end),
+      id: Mongo.object_id() |> BSON.ObjectId.encode!(),
       text: Faker.Lorem.sentence(5),
       author: Generator.run() |> elem(1),
       likes: [],

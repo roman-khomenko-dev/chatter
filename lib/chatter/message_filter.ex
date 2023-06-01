@@ -4,6 +4,7 @@ defmodule Chatter.MessageFilter do
   """
 
   import Ecto.Query, warn: false
+  alias Mongo.Ecto.Helpers
   alias Chatter.{Messages.Message, Repo, Search}
 
   def filter_by_params({search, nil = _filter_option, :id = _mode}),
@@ -19,11 +20,11 @@ defmodule Chatter.MessageFilter do
   end
 
   def filter_by_params({search, filter_option, :full = _mode}) do
-    search_messages = get_search_messages(search)
+    search_messages = search |> get_search_messages() |> Enum.map(&Map.get(&1, :id))
 
     filter_option
     |> filter_by_option()
-    |> Enum.filter(fn message -> message in search_messages end)
+    |> Enum.filter(fn message -> message.id in search_messages end)
   end
 
   def filter_by_option(filter_option) do
@@ -51,112 +52,200 @@ defmodule Chatter.MessageFilter do
   def filter({query, %Search{text: nil, likes: nil} = _search}), do: query
 
   def filter({query, %Search{text: text, likes: nil} = _search}) do
-    ilike_text = "%#{text}%"
-    query |> where([m], ilike(m.text, ^ilike_text))
+    text_regex = Helpers.regex("#{text}")
+
+    query
+    |> where(fragment(text: ["$regex": ^text_regex, "$options": "i"]))
   end
 
   def filter({query, %Search{text: nil, likes_option: option, likes: likes_count} = _search}) do
-    likes_condition = likes_condition(option, likes_count)
-    query |> where([m], ^likes_condition)
+    query |> filter_likes_condition(option, likes_count)
   end
 
   def filter({query, %Search{text: text, likes_option: option, likes: likes_count} = _search}) do
-    {likes_condition, ilike_text} = {likes_condition(option, likes_count), "%#{text}%"}
+    text_regex = Helpers.regex("#{text}")
 
     query
-    |> where([m], ilike(m.text, ^ilike_text))
-    |> where([m], ^likes_condition)
+    |> where(fragment(text: ["$regex": ^text_regex, "$options": "i"]))
+    |> filter_likes_condition(option, likes_count)
   end
 
   defp filter_with_likes_who_like do
-    from(m in Message, where: m.author in subquery(list_likes({true, false})))
+    list_likes = list_likes()
+
+    from(m in Message, where: m.author in ^list_likes)
     |> order_by([m], desc: m.id)
     |> Repo.all()
   end
 
   defp filter_without_likes_who_never_liked do
-    from(m in Message, where: m.author not in subquery(list_likes({true, true})) and m.likes == [])
+    list_likes = list_likes()
+
+    from(m in Message, where: m.author not in ^list_likes and m.likes == [])
     |> order_by([m], desc: m.id)
     |> Repo.all()
   end
 
   defp filter_with_major_likes do
     get_total_likes()
-    |> with_likes_percent()
     |> top_liked()
-    |> Repo.all()
+    |> Message.convert_query_result()
   end
 
   defp get_total_likes do
-    {false, true}
-    |> list_likes()
-    |> Repo.all()
-    |> Enum.count()
-  end
-
-  defp top_liked(with_likes_percent) do
-    Message
-    |> with_cte("with_likes_percent", as: ^with_likes_percent)
-    |> join(:left, [m], ml in "with_likes_percent", on: m.id == ml.id)
-    |> where(
-      [m, ml],
-      ml.row_index <=
-        subquery(
-          from(rows in "with_likes_percent",
-            select: min(rows.row_index),
-            where: rows.cumulative_likes_percent >= 80
-          )
-        )
-    )
-    |> order_by([m], desc: m.id)
-  end
-
-  defp with_likes_percent(total_likes) do
-    from(m in Message,
-      select: %{
-        id: m.id,
-        text: m.text,
-        author: m.author,
-        likes: m.likes,
-        inserted_at: m.inserted_at,
-        updated_at: m.updated_at,
-        cumulative_likes_percent:
-          sum(type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100)
-          |> over(:ordered_likes_percent)
-          |> selected_as(:cumulative_likes_percent),
-        row_index:
-          row_number()
-          |> over(:ordered_likes_percent)
-          |> selected_as(:row_index)
+    Mongo.aggregate(:mongo, "messages", [
+      %{
+        "$project" => %{
+          "likes_count" => %{"$size" => "$likes"}
+        }
       },
-      windows: [
-        ordered_likes_percent: [
-          order_by: [desc: type(fragment("cardinality(?)", m.likes), :float) / ^total_likes * 100]
-        ]
-      ]
-    )
+      %{
+        "$group" => %{
+          "_id" => "null",
+          "total_likes" => %{"$sum" => "$likes_count"}
+        }
+      }
+    ])
+    |> extract_query_data()
+    |> Map.get("total_likes")
   end
 
-  defp likes_condition(option, likes_count) do
-    case option do
-      ">=" -> dynamic([m], fragment("cardinality(?)", m.likes) >= ^likes_count)
-      "<=" -> dynamic([m], fragment("cardinality(?)", m.likes) <= ^likes_count)
-      "=" -> dynamic([m], fragment("cardinality(?)", m.likes) == ^likes_count)
-    end
+  defp top_liked(total_likes) do
+    Mongo.aggregate(:mongo, "messages", [
+      %{
+        "$addFields" => %{
+          "message_total_likes" => %{
+            "$size" => "$likes"
+          }
+        }
+      },
+      %{
+        "$addFields" => %{
+          "likes_percentage" => %{
+            "$multiply" => [
+              %{
+                "$divide" => [100, total_likes]
+              },
+              "$message_total_likes"
+            ]
+          }
+        }
+      },
+      %{
+        "$sort" => %{
+          "likes_percentage" => -1
+        }
+      },
+      %{
+        "$group" => %{
+          "_id" => nil,
+          "messages" => %{
+            "$accumulator" => %{
+              "init" => "function() {
+                return {
+                  likes_percentage_sum: 0,
+                  selected_messages: []
+                };
+              }",
+              "accumulateArgs" => ["$likes_percentage", "$$ROOT"],
+              "accumulate" => "function(state, likesPercentage, message) {
+                if (state.likes_percentage_sum < 80) {
+                  state.likes_percentage_sum += likesPercentage;
+                  state.selected_messages.push(message);
+                }
+                return state;
+              }",
+              "merge" => "function(state1, state2) {
+                if (state1.likes_percentage_sum >= 80) {
+                  return state1;
+                }
+                const merged = {
+                  likes_percentage_sum: state1.likes_percentage_sum + state2.likes_percentage_sum,
+                  selected_messages: state1.selected_messages.concat(state2.selected_messages)
+                };
+                return merged;
+              }",
+              "finalize" => "function(state) {
+                return state.selected_messages;
+              }",
+              "lang" => "js"
+            }
+          }
+        }
+      },
+      %{
+        "$unwind" => "$messages"
+      },
+      %{
+        "$replaceRoot" => %{
+          "newRoot" => "$messages"
+        }
+      },
+      %{
+        "$project" => %{
+          "_id" => 1,
+          "text" => 1,
+          "author" => 1,
+          "likes" => 1,
+          "inserted_at" => 1,
+          "updated_at" => 1
+        }
+      },
+      %{
+        "$sort" => %{
+          "inserted_at" => -1
+        }
+      }
+    ])
+    |> extract_query_data(:list)
   end
 
-  defp list_likes({uniqueness, empty}) do
-    where = empty_likes_condition(empty)
-
-    from(m1 in Message,
-      distinct: ^uniqueness,
-      select: %{likes: fragment("unnest(?)", m1.likes)},
-      where: ^where
-    )
+  defp filter_likes_condition(query, ">=", likes_count) do
+    size = %{"$size": "$likes"}
+    where(query, fragment("$expr": ["$gte": [^size, ^likes_count]]))
   end
 
-  defp empty_likes_condition(empty),
-    do: if(empty == false, do: dynamic([m1], m1.likes != []), else: true)
+  defp filter_likes_condition(query, "<=", likes_count) do
+    size = %{"$size": "$likes"}
+    where(query, fragment("$expr": ["$lte": [^size, ^likes_count]]))
+  end
+
+  defp filter_likes_condition(query, "=", likes_count) do
+    size = %{"$size": "$likes"}
+    where(query, fragment("$expr": ["$eq": [^size, ^likes_count]]))
+  end
+
+  defp list_likes do
+    Mongo.aggregate(:mongo, "messages", [
+      %{
+        "$unwind" => %{
+          "path" => "$likes"
+        }
+      },
+      %{
+        "$group" => %{
+          "_id" => false,
+          "likes" => %{
+            "$addToSet" => "$likes"
+          }
+        }
+      },
+      %{
+        "$project" => %{
+          "_id" => 0,
+          "likes" => 1
+        }
+      }
+    ])
+    |> extract_query_data()
+    |> Map.get("likes")
+  end
+
+  defp extract_query_data(query, mode \\ :element)
+
+  defp extract_query_data(query, :list), do: query |> Enum.to_list()
+
+  defp extract_query_data(query, :element), do: query |> Enum.to_list() |> List.first()
 
   defp convert_blank_text(%{text: nil} = search), do: search
 
